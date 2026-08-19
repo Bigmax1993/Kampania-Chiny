@@ -1,4 +1,5 @@
 name: PL backfill wyslane IMAP
+# Kampania-Chiny Actions index
 
 # Jednorazowo / ręcznie: dopisz kopie .eml z artefaktu do etykiety Gmail „wyslane”.
 on:

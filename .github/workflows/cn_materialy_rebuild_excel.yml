@@ -1,4 +1,5 @@
 name: PL rebuild Excel
+# Kampania-Chiny Actions index
 
 # Przebudowa cn_materialy_kontakte.xlsx z cache + filtr HTTPS; upload na Drive.
 on:

@@ -1,4 +1,5 @@
 name: PL test email (jednorazowo)
+# Kampania-Chiny Actions index
 
 on:
   workflow_dispatch:

@@ -1,4 +1,5 @@
 name: Restore Drive Excel before date
+# Kampania-Chiny Actions index
 
 # Jednorazowe przywrocenie *_kontakte.xlsx na Google Drive do rewizji sprzed daty.
 on:

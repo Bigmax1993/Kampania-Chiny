@@ -22,7 +22,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Repo = "Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny"
+$Repo = "Bigmax1993/Kampania-Chiny"
 $DiscoveryWorkflow = "CN discovery"
 $DiscoveryArtifacts = @("cn-materialy-wyniki-pi")
 $script:DiscoveryRunIds = @()

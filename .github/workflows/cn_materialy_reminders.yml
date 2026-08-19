@@ -1,4 +1,5 @@
 name: PL sync odpowiedzi i przypomnienia
+# Kampania-Chiny Actions index
 
 # Kampania CN materiały — IMAP + przypomnienia co 3 dni (firmy bez odpowiedzi)
 on:
