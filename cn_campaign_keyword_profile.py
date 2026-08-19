@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Wspólny słownik kampanii UA — materiały budowlane (Serper, regex, Claude).
-"""
+"""Wspólny słownik kampanii CN — polscy dystrybutorzy/importerzy (produkt dla eksporterów z Chin)."""
 from __future__ import annotations
 
 from cn_province_keywords import (
@@ -63,41 +61,39 @@ def retail_context_keywords_sample(*, max_items: int = 16) -> list[str]:
     return out
 
 
-def retail_chain_keywords_sample(*, max_items: int = 12) -> list[str]:
+def retail_chain_keywords_sample(*, max_items: int = 20) -> list[str]:
     return list(REQUIRED_RETAIL_CHAIN_KEYWORDS)[:max_items]
 
 
 def small_company_markers_sample(*, max_items: int = 10) -> list[str]:
     return [
-        "сімейне підприємство",
-        "приватне підприємство",
-        "фоп",
-        "регіональний",
-        "місцевий",
-        "невеликий склад",
-        "місцевий виробник",
-        "регіональний постачальник",
-        "тов",
-        "пп",
+        "sp. z o.o.",
+        "firma rodzinna",
+        "regionalny dystrybutor",
+        "lokalny importer",
+        "wyłączny dystrybutor",
+        "oficjalny dystrybutor",
+        "przedstawiciel",
+        "import",
     ][:max_items]
 
 
 def large_company_markers_sample(*, max_items: int = 14) -> list[str]:
     return [
-        "холдинг",
-        "міжнародна мережа",
-        "мережа магазинів",
-        "понад 500 співробітників",
-        "понад 1000 співробітників",
-        "євроцемент",
-        "knauf",
+        "holding",
+        "międzynarodowa sieć",
+        "sieć sklepów",
+        "castorama",
+        "leroy merlin",
+        "obi",
+        "praktiker",
+        "psb",
         "ceramika paradyż",
+        "knauf",
         "henkel",
         "sika",
         "weber",
         "ceresit",
-        "житомирський",
-        "будівельний комбінат",
     ][:max_items]
 
 

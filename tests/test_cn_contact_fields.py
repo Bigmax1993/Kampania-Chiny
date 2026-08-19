@@ -5,6 +5,7 @@ import unittest
 
 from cn_contact_fields import (
     extract_pl_address_from_text,
+    extract_pl_postcode,
     is_pl_junk_company_name,
     is_pl_seo_title,
     looks_like_marketing_text,
@@ -44,10 +45,45 @@ class PlContactFieldsTest(unittest.TestCase):
             "ul. Budowlana 5, 05-120 Legionowo",
         )
 
+    def test_extract_pl_postcode(self):
+        self.assertEqual(extract_pl_postcode("ul. Testowa 1, 00-001 Warszawa"), "00-001")
+        self.assertEqual(extract_pl_postcode("St. Testowa 1, 00-001 Warsaw"), "00-001")
+        self.assertEqual(extract_pl_postcode("brak kodu"), "")
+        self.assertEqual(extract_pl_postcode("", "05-800 Pruszków"), "05-800")
+
+    def test_loose_json_fill_address_without_postal(self):
+        from cn_contact_fields import looks_like_usable_address_for_json_fill
+
+        self.assertTrue(
+            looks_like_usable_address_for_json_fill("ul. Przemysłowa 12, Warszawa")
+        )
+        self.assertFalse(
+            looks_like_usable_address_for_json_fill(
+                "W naszym asortymencie znajdziecie Państwo wysokiej jakości materiały"
+            )
+        )
+
     def test_junk_company_names(self):
         self.assertTrue(is_pl_junk_company_name("Biuro obsługi klienta"))
         self.assertTrue(is_pl_junk_company_name("Artykuły sezonowe"))
         self.assertTrue(is_pl_seo_title("Fugi do kostki brukowej i płyt Warszawa"))
+
+    def test_extracts_labeled_nip(self):
+        from cn_contact_fields import extract_pl_nip_from_text, pl_nip_checksum_ok
+
+        nip = extract_pl_nip_from_text(
+            "MAZUR Sp. z o.o. NIP: 123-456-32-18 ul. Budowlana 1"
+        )
+        self.assertEqual(nip, "123-456-32-18")
+        self.assertTrue(pl_nip_checksum_ok(nip))
+
+    def test_extracts_pl_vat_with_checksum(self):
+        from cn_contact_fields import extract_pl_nip_from_text
+
+        self.assertEqual(
+            extract_pl_nip_from_text("EU VAT PL1234563218"),
+            "123-456-32-18",
+        )
 
     def test_serper_organic_has_no_address(self):
         self.assertEqual(

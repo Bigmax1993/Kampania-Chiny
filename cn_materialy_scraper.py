@@ -280,8 +280,8 @@ STEP_LOG_WITH_TIMESTAMP = True
 
 SERPER_API_URL = "https://google.serper.dev/search"
 SERPER_PLACES_API_URL = "https://google.serper.dev/places"
-SERPER_COUNTRY = "cn"
-SERPER_LANGUAGE = "zh-cn"
+SERPER_COUNTRY = "pl"
+SERPER_LANGUAGE = "pl"
 SERPER_TIMEOUT = 20
 SERPER_DAILY_LIMIT = 1000
 _serper_limit_env = (os.environ.get("SERPER_DAILY_LIMIT") or "").strip()
@@ -294,7 +294,7 @@ if _serper_limit_env:
 SERPER_UNLIMITED = False
 FORCE_SERPER_LOOKUP = True
 SERPER_DISCOVERY_RESULTS_PER_TERM = 30
-COUNTRY_RESTRICTION = "CN"
+COUNTRY_RESTRICTION = "PL"
 ENABLE_REGION_PLZ_FILTER = False
 ENABLE_DISTANCE_FROM_REGION_KM = False
 ENABLE_PLZ_PREFIX_REGION_MATCH = False
@@ -310,10 +310,10 @@ ENABLE_AUTO_EMAIL = True
 # Własny szablon z GUI (Claude dopracowuje per firma); nie dotyczy przypomnień
 CUSTOM_EMAIL_DRAFT = ""
 USE_CUSTOM_EMAIL_TEMPLATE = False
-CUSTOM_EMAIL_LANG = "zh"
-CUSTOM_EMAIL_CITY = "Chiny"
+CUSTOM_EMAIL_LANG = "pl"
+CUSTOM_EMAIL_CITY = "Polska"
 CUSTOM_EMAIL_CONTEXT: dict = {}
-EMAIL_SUBJECT_TEMPLATE = "建材批发询价 / 寻求经销合作"
+EMAIL_SUBJECT_TEMPLATE = "Współpraca dystrybucyjna — producent z Chin"
 # Obligatorischer Betreff (word-for-word; bez zmian przez LLM)
 FIXED_EMAIL_SUBJECT_PL = EMAIL_SUBJECT_TEMPLATE
 BACKGROUND_ONLY_DEFAULT = True
@@ -327,9 +327,9 @@ SEND_WINDOW_END_HOUR = _SEND_WINDOW_CFG.end_hour
 SEND_WINDOW_DISABLED = _SEND_WINDOW_CFG.disabled
 SUBJECT_VARIANTS = [FIXED_EMAIL_SUBJECT_PL]
 PROMPT_VARIANTS = [
-    "Офіційний діловий стиль, конкретно і по суті.",
-    "Природний B2B-стиль — як лист від менеджера закупівель, без канцеляризмів.",
-    "Коротко й професійно, з акцентом на асортимент і оптові умови.",
+    "Oficjalny styl B2B, konkretnie i na temat.",
+    "Naturalny styl B2B — jak list od menedżera ds. eksportu, bez kantów.",
+    "Krótko i profesjonalnie, z akcentem na dystrybucję i import.",
 ]
 EMAIL_SEND_DELAY_MIN_SECONDS = 22
 EMAIL_SEND_DELAY_MAX_SECONDS = 58
@@ -437,27 +437,30 @@ SUPPRESSED_EMAIL_LOCALPARTS = {
     "postmaster",
 }
 EXPORT_COLUMNS = [
-    "Firmenname",
-    "Adresse",
-    "Prowincja",
-    "Telefon",
+    "Name of Company",
+    "Line of business",
+    "Company website",
     "E-Mail",
-    "Webseite",
-    "Kategorie_materialow",
-    "WWW_geprueft",
-    "Kleinunternehmen",
+    "Phone number",
+    "Region",
+    "Localisation",
+    "Postcode",
+    "Tax Identification Number",
 ]
 PL_WOJEWODZTWA = [
-    "guangdong", "malochińskie", "slaskie", "wielkochińskie", "dolnoslaskie",
+    "mazowieckie", "malopolskie", "slaskie", "wielkopolskie", "dolnoslaskie",
     "pomorskie", "lodzkie", "zachodniopomorskie", "lubelskie", "podkarpackie",
     "kujawsko-pomorskie", "warminsko-mazurskie", "swietokrzyskie", "podlaskie",
-    "lubuskie", "ochińskie",
+    "lubuskie", "opolskie",
 ]
 
 # Kontext Anfrage (Referenz im Code; Mailtext = fester Block unten)
-INQUIRY_REGION_CN = "Chiny"
-MATERIAL_CATEGORIES_PL = "瓷砖, 卫浴, 灯具, 铝型材, 五金, 地板, 涂料"
-DELIVERY_ADDRESS_PL = "Chiny"
+INQUIRY_REGION_CN = "Polska"
+MATERIAL_CATEGORIES_PL = (
+    "płytki, ceramika, armatura, LED, SPC, aluminium, chemia, okna PVC, stal, "
+    "drzwi, kabiny prysznicowe, instalacje sanitarne"
+)
+DELIVERY_ADDRESS_PL = "Polska"
 
 # Tylko Generalunternehmer (GU) — nie sam Ladenbau ani ogólne Bauunternehmen
 REQUIRE_GENERALUNTERNEHMER = True
@@ -738,45 +741,57 @@ def save_csv(rows, path: Path) -> None:
 
 
 def build_excel_info_sheet_rows() -> list[dict]:
-    """Arkusz Info w Excelu — zasady zapisu (append, nie pełna przebudowa)."""
+    """Info sheet — English only."""
     return [
         {
-            "Temat": "Tryb zapisu Excel",
-            "Wartość": (
-                "APPEND — pipeline dopisuje nowe firmy i aktualizuje istniejące wiersze "
-                "(po www/url). Nie przebudowuje pliku od zera przy każdym uruchomieniu."
+            "Topic": "Excel write mode",
+            "Value": (
+                "APPEND — new companies are added and existing rows are updated by URL. "
+                "The file is not rebuilt from scratch on every run."
             ),
         },
         {
-            "Temat": "Start każdego runu",
-            "Wartość": (
-                "Scraper ładuje istniejący plik Excel (arkusz Kontakte), potem dopisuje "
-                "nowe wiersze z discovery / backfill / cache JSON."
+            "Topic": "Language",
+            "Value": (
+                "All cell values are English except company names "
+                "(Name of Company), which stay in the original language."
             ),
         },
         {
-            "Temat": "Czego nie robić ręcznie",
-            "Wartość": (
-                "Nie kasuj wszystkich wierszy w Kontakte — przy pustym Excelu i pustym "
-                "cache pipeline nie odtworzy historii. Edycja pojedynczych wierszy OK."
+            "Topic": "Start of each run",
+            "Value": (
+                "The scraper loads the existing Contacts sheet, then appends new rows "
+                "from discovery / backfill / JSON cache."
             ),
         },
         {
-            "Temat": "--rebuild-from-cache",
-            "Wartość": (
-                "Scala wiersze z JSON cache + istniejący Excel (merge po URL). "
-                "Gdy contacts=0 w cache — zachowuje dotychczasowe wiersze z Excela."
+            "Topic": "Do not delete rows",
+            "Value": (
+                "Do not clear the Contacts sheet. With an empty workbook and empty cache "
+                "the pipeline cannot restore history. Editing individual rows is OK."
             ),
         },
         {
-            "Temat": "Arkusze",
-            "Wartość": "Info (ten arkusz) | Kontakte (firmy) | Prowincje (podsumowanie landów)",
+            "Topic": "--rebuild-from-cache",
+            "Value": (
+                "Merges JSON cache rows with the existing Excel file (by URL). "
+                "If the cache has no contacts, existing Excel rows are kept."
+            ),
         },
         {
-            "Temat": "Cache JSON",
-            "Wartość": (
-                "Osobny plik de_gu_bauunternehmen_cache.json — kumulacja tygodniowa; "
-                "reset cache ≠ kasowanie Excela (chyba że świadomie usuniesz plik .xlsx)."
+            "Topic": "Sheets",
+            "Value": (
+                "Info | Kontakte (companies) | Prowincje (regions). "
+                "Kontakte columns: Name of Company, Line of business, Company website, "
+                "E-Mail, Phone number, Region, Localisation, Postcode, "
+                "Tax Identification Number."
+            ),
+        },
+        {
+            "Topic": "JSON cache",
+            "Value": (
+                "Separate weekly cache file (GitHub Actions artifact). "
+                "Resetting the cache does not delete the Excel file."
             ),
         },
     ]
@@ -813,8 +828,10 @@ def save_excel(
         cfg = ReplySyncConfig(
             cache_path=CACHE_FILE,
             xlsx_path=path,
-            lang="zh",
+            lang="en",
             campaign_id="cn_materialy",
+            email_column="E-Mail",
+            include_reply_export_columns=False,
         )
         try:
             write_excel_with_reply_styles(
@@ -839,8 +856,10 @@ def save_excel(
             cfg_alt = ReplySyncConfig(
                 cache_path=CACHE_FILE,
                 xlsx_path=alt,
-                lang="zh",
+                lang="en",
                 campaign_id="cn_materialy",
+                email_column="E-Mail",
+                include_reply_export_columns=False,
             )
             write_excel_with_reply_styles(
                 alt,
@@ -1243,6 +1262,35 @@ def apply_row_enrichment_to_row(row: dict, llm_result: dict) -> None:
         row["url"] = website_base_url(llm_result.get("url")) or row.get("url", "")
 
 
+def line_of_business_from_row(row: dict) -> str:
+    """Kategoria działalności do kolumny Line of business."""
+    for key in (
+        "line_of_business",
+        "kategoria",
+        "discovery_search_term",
+        "fraza",
+        "retail_chains_found",
+        "gu_marker",
+    ):
+        val = str(row.get(key) or "").strip()
+        if val:
+            return val[:220]
+    return ""
+
+
+def tax_id_from_row(row: dict) -> str:
+    from cn_contact_fields import extract_pl_nip_from_text, normalize_pl_nip
+
+    nip = normalize_pl_nip(str(row.get("nip") or row.get("tax_id") or ""))
+    if nip:
+        return nip
+    blob = " ".join(
+        str(row.get(k) or "")
+        for k in ("page_snippet", "full_address", "adres", "verification_reason")
+    )
+    return extract_pl_nip_from_text(blob)
+
+
 def format_handelsketten_for_excel(raw: str) -> str:
     parts: list[str] = []
     for item in re.split(r"[,;/|]+", raw or ""):
@@ -1301,34 +1349,76 @@ def finalize_row_for_excel_tables(row: dict) -> dict:
     )
     if row.get("bundesland") not in PL_WOJEWODZTWA:
         row["bundesland"] = extract_bundesland(row)
+    nip = tax_id_from_row(row)
+    if nip:
+        row["nip"] = nip
+    if not str(row.get("kod_pocztowy") or row.get("postcode") or "").strip():
+        from cn_contact_fields import extract_pl_postcode
+
+        postcode = extract_pl_postcode(
+            row.get("kod_pocztowy"),
+            row.get("postcode"),
+            row.get("adres"),
+            row.get("full_address"),
+            row.get("page_snippet"),
+        )
+        if postcode:
+            row["kod_pocztowy"] = postcode
+    if not str(row.get("kategoria") or "").strip():
+        lob = line_of_business_from_row(row)
+        if lob:
+            row["kategoria"] = lob
     return row
 
 
 def row_to_excel_kontakte_columns(row: dict, email: str = "") -> dict:
-    """Mapuje wiersz pipeline na kolumny arkusza Kontakte."""
+    """Mapuje wiersz pipeline na kolumny arkusza Kontakte (EN, nazwy firm bez zmian)."""
+    from cn_excel_en import (
+        line_of_business_to_english,
+        localisation_to_english,
+        region_to_english,
+    )
+
+    from cn_contact_fields import extract_pl_postcode
+
     row = finalize_row_for_excel_tables(dict(row))
     mail = (email or row.get("email_target") or "").strip()
     website = (row.get("official_website") or row.get("www") or "").strip()
+    address = (row.get("adres") or row.get("full_address") or "").strip()
+    localisation = localisation_to_english(address)
+    postcode = (
+        (row.get("kod_pocztowy") or row.get("postcode") or "").strip()
+        or extract_pl_postcode(address, localisation, row.get("page_snippet"))
+    )
     return {
-        "Nazwa firmy": (row.get("company_name_clean") or row.get("nazwa") or "").strip(),
-        "Adres": (row.get("adres") or row.get("full_address") or "").strip(),
-        "Prowincja": (row.get("bundesland") or row.get("discovery_bundesland") or "").strip(),
-        "Telefon": (row.get("telefon") or "").strip(),
-        "E-mail": mail,
-        "Strona www": website,
+        "Name of Company": (row.get("company_name_clean") or row.get("nazwa") or "").strip(),
+        "Line of business": line_of_business_to_english(line_of_business_from_row(row)),
+        "Company website": website,
+        "E-Mail": mail,
+        "Phone number": (row.get("telefon") or "").strip(),
+        "Region": region_to_english(
+            (row.get("bundesland") or row.get("discovery_bundesland") or "").strip()
+        ),
+        "Localisation": localisation,
+        "Postcode": postcode,
+        "Tax Identification Number": tax_id_from_row(row),
         "URL": (row.get("url") or website_base_url(website) or "").strip(),
-        "Kategorie_materialow": (row.get("retail_chains_found") or "").strip(),
     }
 
 
 def row_to_excel_wojewodztwa_columns(row: dict) -> dict:
-    """Mapuje wiersz pipeline na kolumny arkusza Prowincje."""
+    """Mapuje wiersz pipeline na kolumny arkusza Prowincje (EN)."""
+    from cn_excel_en import localisation_to_english, region_to_english
+
     row = finalize_row_for_excel_tables(dict(row))
     return {
-        "Nazwa firmy": (row.get("company_name_clean") or row.get("nazwa") or "").strip(),
-        "Prowincja": (row.get("bundesland") or row.get("discovery_bundesland") or "").strip(),
-        "Adres": (row.get("adres") or row.get("full_address") or "").strip(),
-        "Strona www": (row.get("official_website") or row.get("www") or "").strip(),
+        "Name of Company": (row.get("company_name_clean") or row.get("nazwa") or "").strip(),
+        "Region": region_to_english(
+            (row.get("bundesland") or row.get("discovery_bundesland") or "").strip()
+        ),
+        "Localisation": localisation_to_english(
+            (row.get("adres") or row.get("full_address") or "").strip()
+        ),
         "URL": (row.get("url") or "").strip(),
     }
 
@@ -1564,19 +1654,16 @@ def build_export_rows(rows, logger=None, cache=None, require_eligible=True):
             table_cols = row_to_excel_kontakte_columns(row, email)
         else:
             table_cols = row_to_excel_kontakte_columns(row, email)
-        base = {
-            **table_cols,
-            "WWW_geprueft": "ja" if row.get("retail_verified") else "nein",
-            "Kleinunternehmen": "ja" if row.get("is_small_firm") else "nein",
-            "GU": "ja" if row.get("is_gu") or _row_has_gu_signal(row) else "nein",
-            "GU_Marker": (row.get("gu_marker") or "").strip(),
-            "Status": _excel_status_label(row),
-        }
+        base = dict(table_cols)
         if cache is not None and email:
-            base = merge_export_row(base, cache, email, lang="zh")
+            base = merge_export_row(base, cache, email, lang="en")
         export_rows.append(base)
     if logger is not None:
-        with_mail = sum(1 for r in export_rows if (r.get("E-mail") or "").strip())
+        with_mail = sum(
+            1
+            for r in export_rows
+            if (r.get("E-Mail") or r.get("E-mail") or "").strip()
+        )
         logger.info(
             "Excel Kontakte: %s wierszy (%s z e-mailem, %s bez) z %s w pipeline",
             len(export_rows),
@@ -1593,12 +1680,12 @@ def build_bundesland_rows(rows):
     for row in rows:
         row = normalize_row_company_name(row)
         table = row_to_excel_wojewodztwa_columns(row)
-        row_name = (table.get("Nazwa firmy") or "").strip()
+        row_name = (table.get("Name of Company") or table.get("Nazwa firmy") or "").strip()
         row_url = (table.get("URL") or "").strip()
         if row_name.lower() == "nieznana firma" and not row_url:
             continue
-        row_state = (table.get("Prowincja") or "").strip()
-        row_address = (table.get("Adres") or "").strip()
+        row_state = (table.get("Region") or table.get("Prowincja") or "").strip()
+        row_address = (table.get("Localisation") or table.get("Adres") or "").strip()
         dedupe_key = row_url or f"{row_name}|{row_state}|{row_address}"
         if dedupe_key in seen:
             continue
@@ -1617,13 +1704,28 @@ def persist_progress(all_rows, cache, logger: logging.Logger, reason: str = "") 
 
 
 EXCEL_IMPORT_COLUMNS = {
+    "Name of Company": "nazwa",
     "Nazwa firmy": "nazwa",
-    "Adres": "adres",
+    "Firmenname": "nazwa",
+    "Line of business": "kategoria",
+    "Company website": "www",
+    "Kategorie_materialow": "kategoria",
+    "E-Mail": "email_target",
+    "E-mail": "email_target",
+    "Phone number": "telefon",
+    "Telefon": "telefon",
+    "Region": "bundesland",
     "Prowincja": "bundesland",
     "Oblast": "bundesland",
-    "Telefon": "telefon",
-    "E-mail": "email_target",
+    "Localisation": "adres",
+    "Adres": "adres",
+    "Postcode": "kod_pocztowy",
+    "Postal code": "kod_pocztowy",
+    "Kod pocztowy": "kod_pocztowy",
+    "Tax Identification Number": "nip",
+    "NIP": "nip",
     "Strona www": "www",
+    "Webseite": "www",
     "URL": "url",
     "GU_Marker": "gu_marker",
     "Status": "email_status",
@@ -1631,7 +1733,7 @@ EXCEL_IMPORT_COLUMNS = {
 
 
 def row_from_excel_record(rec: dict) -> dict:
-    """Mapuje chińskie nagłówki z Excela na pola wewnętrzne scrapera."""
+    """Mapuje nagłówki z Excela (EN + starsze PL/DE) na pola wewnętrzne scrapera."""
     row: dict = {}
     for col_pl, field in EXCEL_IMPORT_COLUMNS.items():
         for key in (col_pl, field):
@@ -1643,12 +1745,35 @@ def row_from_excel_record(rec: dict) -> dict:
     if name:
         row["company_name_raw"] = name
         row["company_name_clean"] = name
+    if row.get("bundesland"):
+        from cn_excel_en import region_to_internal
+
+        row["bundesland"] = region_to_internal(row["bundesland"]) or row["bundesland"]
     if row.get("adres"):
         row["full_address"] = row["adres"]
+    if not (row.get("kod_pocztowy") or "").strip():
+        from cn_contact_fields import extract_pl_postcode
+
+        postcode = extract_pl_postcode(
+            rec.get("Postcode"),
+            rec.get("Postal code"),
+            rec.get("Kod pocztowy"),
+            row.get("adres"),
+            row.get("full_address"),
+        )
+        if postcode:
+            row["kod_pocztowy"] = postcode
     if row.get("telefon"):
         row["phones_found"] = row["telefon"]
     if row.get("www"):
         row["official_website"] = row["www"]
+    if row.get("nip"):
+        from cn_contact_fields import normalize_pl_nip
+
+        row["nip"] = normalize_pl_nip(row["nip"]) or row["nip"]
+        row["tax_id"] = row["nip"]
+    if row.get("kategoria") and not row.get("retail_chains_found"):
+        row["retail_chains_found"] = row["kategoria"]
     www_checked = str(rec.get("WWW_geprueft") or "").strip().lower()
     if www_checked == "ja":
         row["retail_verified"] = True
@@ -1667,9 +1792,15 @@ def row_from_excel_record(rec: dict) -> dict:
         row["is_small_firm"] = True
     elif small_col == "nein":
         row["is_small_firm"] = False
-    chains = str(rec.get("Kategorie_materialow") or "").strip()
+    chains = str(
+        rec.get("Line of business")
+        or rec.get("Kategorie_materialow")
+        or rec.get("kategoria")
+        or ""
+    ).strip()
     if chains:
         row["retail_chains_found"] = chains
+        row["kategoria"] = row.get("kategoria") or chains
     return row
 
 
@@ -1865,12 +1996,26 @@ def row_from_cache_contact(place_url: str, info: dict) -> dict | None:
             "contact_sources": info.get("contact_sources") or "",
             "is_small_firm": info.get("is_small_firm", True),
             "contact_quality_score": int(info.get("contact_quality_score", 0) or 0),
+            "nip": info.get("nip") or info.get("tax_id") or "",
+            "kod_pocztowy": info.get("kod_pocztowy") or info.get("postcode") or "",
+            "kategoria": info.get("kategoria") or info.get("line_of_business") or "",
+            "line_of_business": info.get("line_of_business")
+            or info.get("kategoria")
+            or "",
         }
     )
 
 
+def _merge_value_is_blank(val) -> bool:
+    if val is None:
+        return True
+    if isinstance(val, str) and not str(val).strip():
+        return True
+    return False
+
+
 def merge_pipeline_rows(existing: list[dict], incoming: list[dict]) -> list[dict]:
-    """Łączy wiersze pipeline po URL (incoming nadpisuje pola istniejących)."""
+    """Łączy wiersze pipeline po URL: dopisuje nowe, uzupełnia puste — nie kasuje danych."""
     by_url = index_all_rows_by_url(list(existing))
     merged = list(existing)
     for row in incoming:
@@ -1878,7 +2023,11 @@ def merge_pipeline_rows(existing: list[dict], incoming: list[dict]) -> list[dict
         if not url:
             continue
         if url in by_url:
-            by_url[url].update(row)
+            target = by_url[url]
+            for key, val in row.items():
+                if _merge_value_is_blank(val) and not _merge_value_is_blank(target.get(key)):
+                    continue
+                target[key] = val
         else:
             merged.append(row)
             by_url[url] = row
@@ -2153,6 +2302,9 @@ def pipeline_row_to_contact_info(row: dict) -> dict:
             "contact_quality_score": int(row.get("contact_quality_score", 0) or 0),
             "full_address": (row.get("full_address") or row.get("adres") or "").strip(),
             "bundesland": (row.get("bundesland") or "").strip(),
+            "nip": (row.get("nip") or row.get("tax_id") or "").strip(),
+            "kod_pocztowy": (row.get("kod_pocztowy") or row.get("postcode") or "").strip(),
+            "kategoria": (row.get("kategoria") or line_of_business_from_row(row)).strip(),
         }.items()
         if v not in ("", None) or k in (
             "retail_verified",
@@ -2807,7 +2959,9 @@ def request_with_retry(
 
 
 def choose_subject_variant(company_name: str) -> str:
-    _ = company_name
+    name = (company_name or "").strip()
+    if name and name.casefold() not in {"dostawca", "firma"}:
+        return f"Współpraca dystrybucyjna — {name}"[:78].rstrip(" -")
     return FIXED_EMAIL_SUBJECT_PL
 
 
@@ -3206,7 +3360,7 @@ def merge_contacts_from_crawl(crawl, website: str) -> dict:
             f"{', '.join(impressum_emails[:3])}"
         )
     page_snippet = _truncate_page_snippet(" ".join(text_parts))
-    from cn_contact_fields import extract_pl_address_from_text
+    from cn_contact_fields import extract_pl_address_from_text, extract_pl_nip_from_text
 
     full_address = ""
     for url in crawl.urls_visited:
@@ -3228,6 +3382,7 @@ def merge_contacts_from_crawl(crawl, website: str) -> dict:
         "source_urls": source_urls,
         "page_snippet": page_snippet,
         "full_address": full_address,
+        "nip": extract_pl_nip_from_text(page_snippet),
     }
 
 
@@ -4164,6 +4319,13 @@ def reconcile_contact_sources(row: dict, collected: dict) -> dict:
             fallback_text=snippet,
         )
         row["full_address"] = row["adres"]
+    from cn_contact_fields import extract_pl_nip_from_text
+
+    nip = str(collected.get("nip") or row.get("nip") or "").strip()
+    if not nip:
+        nip = extract_pl_nip_from_text(snippet)
+    if nip:
+        row["nip"] = nip
     return row
 
 
@@ -5163,9 +5325,9 @@ def collect_contacts_from_website(
 
 
 def _assemble_inquiry_email_body(company_name: str, opening: str = "") -> str:
-    """Fallback — stały szablon UA gdy Claude niedostępny."""
-    _ = company_name, opening
-    return FIXED_MATERIAL_INQUIRY_ZH.strip()
+    """Fallback — szablon z nazwą tej firmy, gdy Claude niedostępny."""
+    _ = opening
+    return build_fixed_material_inquiry_zh(company_name).strip()
 
 
 def generate_email_content(
@@ -5400,7 +5562,7 @@ def _process_email_jobs(
                 c,
                 subject,
                 body=body,
-                lang="zh",
+                lang="pl",
                 campaign_id="cn_materialy",
             )
         if status.startswith("error:"):
@@ -6437,11 +6599,11 @@ def _run_smoke_tests() -> None:
     assert location_within_region_km("GU Filialbau Köln Nordrhein-Westfalen")
     assert ENABLE_PLZ_PREFIX_REGION_MATCH is False
     assert ENABLE_REGION_PLZ_FILTER is False
-    assert "Chiny" in INQUIRY_REGION_CN
-    assert "瓷砖" in MATERIAL_CATEGORIES_PL
-    assert "经销商" in FIXED_MATERIAL_INQUIRY_ZH
-    assert "瓷砖" in FIXED_MATERIAL_INQUIRY_ZH
-    assert "询价" in FIXED_EMAIL_SUBJECT_PL
+    assert "Polska" in INQUIRY_REGION_CN
+    assert "płytki" in MATERIAL_CATEGORIES_PL
+    assert "dystrybutor" in FIXED_MATERIAL_INQUIRY_ZH
+    assert "płytki" in FIXED_MATERIAL_INQUIRY_ZH
+    assert "dystrybucyjn" in FIXED_EMAIL_SUBJECT_PL.lower()
     assert "MFG" not in FIXED_EMAIL_SUBJECT_PL
     from cn_materialy_inquiry_email_zh import (
         DEFAULT_INQUIRY_PHONE_CN,
@@ -6454,31 +6616,34 @@ def _run_smoke_tests() -> None:
     assert DEFAULT_INQUIRY_SENDER_NAME_CN == "Maksym Swinczak"
     assert DEFAULT_INQUIRY_PHONE_CN == "516513965"
     assert inquiry_sender_name() in FIXED_MATERIAL_INQUIRY_ZH
-    assert inquiry_phone() in build_inquiry_signature_zh()
-    assert FIXED_EMAIL_SUBJECT_PL.startswith("建材")
-    assert choose_subject_variant("Test Sp. z o.o.") == FIXED_EMAIL_SUBJECT_PL
+    assert inquiry_phone() not in build_inquiry_signature_zh()
+    assert "516513965" not in FIXED_MATERIAL_INQUIRY_ZH
+    assert "swinczakdata" not in FIXED_MATERIAL_INQUIRY_ZH.lower()
+    assert FIXED_EMAIL_SUBJECT_PL.startswith("Współpraca")
+    assert "Test Sp. z o.o." in choose_subject_variant("Test Sp. z o.o.")
     assert get_email_attachments_cn_materialy() == []
     assert ENABLE_EMAIL_ATTACHMENT is False
     assert PL_EMAIL_ALLOW_ATTACHMENTS is False
     assert callable(send_email_cn_materialy)
     assert ENABLE_CLAUDE_INQUIRY_EMAIL is True
     body = _assemble_inquiry_email_body("Test Sp. z o.o.", "Krótki test.")
-    assert body == FIXED_MATERIAL_INQUIRY_ZH.strip()
+    assert "Test Sp. z o.o." in body
+    assert "Krótki test" not in body
     from cn_claude_prompts import build_personalized_inquiry_email_prompt_zh
 
     prompt = build_personalized_inquiry_email_prompt_zh(
-        company_name="佛山建材经销商",
-        website="https://foshan-tile.cn",
-        wojewodztwo="guangdong",
-        materials="瓷砖, 卫浴",
-        page_snippet="瓷砖 批发 经销商 佛山",
+        company_name="Warszawski Dystrybutor Płytek Sp. z o.o.",
+        website="https://dystrybutor-plytki.pl",
+        wojewodztwo="mazowieckie",
+        materials="płytki, ceramika",
+        page_snippet="płytki dystrybutor importer Warszawa",
     )
-    assert "chiń" in prompt.lower() or "中国" in prompt
-    assert "佛山建材经销商" in prompt
+    assert "polsk" in prompt.lower() or "dystrybutor" in prompt.lower()
+    assert "Warszawski Dystrybutor Płytek Sp. z o.o." in prompt
     cleaned = sanitize_email_body(FIXED_MATERIAL_INQUIRY_ZH)
     assert "\n\n" in cleaned
-    assert "尊敬的" in cleaned
-    assert "此致敬礼" in cleaned
+    assert "Szanowni Państwo" in cleaned
+    assert "Z poważaniem" in cleaned
     assert "Krótki test" not in body
     assert is_germany_de_candidate("https://firma.pl/kontakt", "Hurtownia Budowlana", "")
     from contact_extract_utils import parse_contact_extract_response
@@ -6548,10 +6713,10 @@ def _run_smoke_tests() -> None:
         name="Baufirma SuS Bau",
     )
     assert is_valid_retail_store_builder_contact(
-        email="info@foshan-tile.cn",
-        url="https://www.foshan-tile.cn/",
-        name="佛山市建材经销商有限公司",
-        text="瓷砖 卫浴 批发 经销商 产品目录 价格表 现货",
+        email="info@plytki-dystrybucja.pl",
+        url="https://www.plytki-dystrybucja.pl/",
+        name="Warszawski Dystrybutor Płytek Sp. z o.o.",
+        text="płytki ceramika importer dystrybutor katalog cennik asortyment",
     )
     assert not is_valid_retail_store_builder_contact(
         email="info@design.pl",
@@ -6560,10 +6725,10 @@ def _run_smoke_tests() -> None:
         text="Remont mieszkań pod klucz wykończenia wnętrz",
     )
     assert is_valid_retail_store_builder_contact(
-        name="义乌建材代理商有限公司",
-        url="https://yiwu-building.cn",
-        email="info@yiwu-building.cn",
-        text="灯具 铝型材 代理商 批发 产品中心",
+        name="Krakowski Importer Armatury Sp. z o.o.",
+        url="https://armatura-import.pl",
+        email="info@armatura-import.pl",
+        text="armatura LED oficjalny dystrybutor katalog",
     )
     assert not is_valid_retail_store_builder_contact(
         url="https://www.olx.pl/ogloszenie",
@@ -6587,7 +6752,7 @@ def _run_smoke_tests() -> None:
         build_region_suffix,
     )
 
-    assert build_region_suffix(["guangdong"]) == "中国"
+    assert build_region_suffix(["mazowieckie"]) == "Polska"
     assert len(SERPER_DISCOVERY_BROAD_TERMS) >= 10
     assert len(SERPER_DISCOVERY_LANDKREIS_TERMS) >= 5
     assert len(SERPER_DISCOVERY_PLACES_TERMS) >= 5
@@ -6610,9 +6775,9 @@ def _run_smoke_tests() -> None:
     from cn_materialy_supplier_filter import is_serper_only_pending_candidate
 
     assert is_serper_only_pending_candidate(
-        name="佛山瓷砖经销商",
-        url="https://foshan-tile.cn",
-        text="瓷砖 批发 经销商 产品目录",
+        name="Warszawski Dystrybutor Płytek",
+        url="https://plytki-dystrybucja.pl",
+        text="płytki dystrybutor importer katalog",
     )
     assert not is_serper_only_pending_candidate(
         name="Studio designu", url="https://design.pl", text="wykończenia wnętrz"
@@ -6625,15 +6790,15 @@ def _run_smoke_tests() -> None:
     assert best == "info@budmat.pl" and sc >= MIN_EMAIL_SCORE_FOR_SEND
     assert is_row_eligible_for_excel_export(
         {
-            "nazwa": "佛山市建材经销商有限公司",
-            "url": "https://foshan-tile.cn",
+            "nazwa": "Warszawski Dystrybutor Płytek Sp. z o.o.",
+            "url": "https://plytki-dystrybucja.pl",
             "email_target": "",
             "retail_verified": True,
             "is_gu": True,
-            "gu_marker": "经销商",
+            "gu_marker": "dystrybutor",
             "verification_reason": "claude_material_supplier",
-            "page_snippet": "瓷砖 批发 经销商 产品目录",
-            "retail_chains_found": "瓷砖",
+            "page_snippet": "płytki dystrybutor importer katalog",
+            "retail_chains_found": "płytki",
         }
     )
     assert not is_row_eligible_for_excel_export(
@@ -6646,9 +6811,9 @@ def _run_smoke_tests() -> None:
         }
     )
     assert len(SERPER_DISCOVERY_TERMS) >= 100
-    assert "新闻" in SERPER_NEGATIVE_TERMS
-    assert SERPER_COUNTRY == "cn"
-    assert COUNTRY_RESTRICTION == "CN"
+    assert "olx" in SERPER_NEGATIVE_TERMS
+    assert SERPER_COUNTRY == "pl"
+    assert COUNTRY_RESTRICTION == "PL"
     from http_page_guard import is_waf_blocked
 
     assert is_waf_blocked(exc=Exception("522 ServerError for url"))

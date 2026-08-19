@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 from scripts.gdrive_upload_wyniki import (  # noqa: E402
     _gdrive_append_xlsx_enabled,
     _gdrive_version_xlsx_enabled,
+    _is_appendable_kontakte_xlsx,
     _skip_gdrive_upload,
     versioned_xlsx_upload_name,
 )
@@ -34,6 +35,15 @@ class GdriveUploadDefaultsTest(unittest.TestCase):
         finally:
             if env is not None:
                 os.environ["GDRIVE_APPEND_XLSX"] = env
+
+    def test_append_enabled_for_cn_kontakte_not_other_files(self):
+        self.assertTrue(
+            _is_appendable_kontakte_xlsx("cn", Path("Wyniki/cn_materialy_kontakte.xlsx"))
+        )
+        self.assertFalse(_is_appendable_kontakte_xlsx("cn", Path("Wyniki/notes.txt")))
+        self.assertFalse(
+            _is_appendable_kontakte_xlsx("ua", Path("Wyniki/cn_materialy_kontakte.xlsx"))
+        )
 
 
 class GdriveSkipUploadTest(unittest.TestCase):

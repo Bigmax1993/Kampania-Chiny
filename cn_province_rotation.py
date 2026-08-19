@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Rotacja prowincji PL — jedno prowincjio na cykl discovery.
+Rotacja województw PL — jedno województwo na cykl discovery (kampania CN).
 
 Stan: Wyniki/cn_materialy_province_rotation.json
 """
@@ -17,22 +17,22 @@ from cn_province_keywords import PROVINCE_CONFIG, configure_campaign_provinces
 DEFAULT_ROTATION_START = date(2026, 7, 14)
 
 PROVINCE_ROTATION_ORDER: tuple[str, ...] = (
-    "guangdong",
-    "zhejiang",
-    "jiangsu",
-    "shandong",
-    "shanghai",
-    "fujian",
-    "hebei",
-    "sichuan",
-    "henan",
-    "hubei",
-    "beijing",
-    "tianjin",
-    "chongqing",
-    "anhui",
-    "liaoning",
-    "jiangxi",
+    "mazowieckie",
+    "slaskie",
+    "malopolskie",
+    "wielkopolskie",
+    "dolnoslaskie",
+    "pomorskie",
+    "lodzkie",
+    "zachodniopomorskie",
+    "lubelskie",
+    "podkarpackie",
+    "kujawsko-pomorskie",
+    "warminsko-mazurskie",
+    "swietokrzyskie",
+    "podlaskie",
+    "lubuskie",
+    "opolskie",
 )
 BUNDESLAND_ROTATION_ORDER = PROVINCE_ROTATION_ORDER
 
@@ -138,14 +138,14 @@ def format_rotation_status(wyniki_dir: Path) -> str:
     if not rotation_is_active():
         return (
             f"Rotacja prowincji od {start.isoformat()} — "
-            f"teraz tryb cała Chiny (bez rotacji). "
+            f"teraz tryb cała Polska (bez rotacji). "
             f"Następne po starcie: {PROVINCE_ROTATION_ORDER[0]}"
         )
     current = peek_next_province(state)
     nxt_idx = int(state.get("next_index", 0))
     nxt = PROVINCE_ROTATION_ORDER[(nxt_idx + 1) % len(PROVINCE_ROTATION_ORDER)]
     return (
-        f"Bieżące prowincjio (ten tydzień): {current} | "
+        f"Bieżące województwo (ten tydzień): {current} | "
         f"następne po zakończeniu: {nxt} | "
         f"indeks={nxt_idx}/{len(PROVINCE_ROTATION_ORDER)}"
     )

@@ -61,9 +61,7 @@ SEND_WINDOW_END = 18
 
 SIGNATURE_PL = (
     "Z poważaniem,\n\n"
-    "Maksym Swinczak\n"
-    "https://swinczakdata.pl\n"
-    "tel. 516513965"
+    "Maksym Swinczak"
 )
 # W stopce przypomnień DE pozostaje MFG (kampanie niemieckie)
 SIGNATURE_DE = (
@@ -234,6 +232,7 @@ class ReplySyncConfig:
     imap_days_back: int = 14
     main_sheet_names: tuple[str, ...] = ("Kontakte", "Kontakty", "Baza firm")
     email_column: str = "E-mail"
+    include_reply_export_columns: bool = True
 
 
 UNKNOWN_COMPANY_LABEL_PL = "Nieznana firma"
@@ -242,6 +241,7 @@ UNKNOWN_COMPANY_LABELS = (UNKNOWN_COMPANY_LABEL_PL, UNKNOWN_COMPANY_LABEL_DE)
 _UNKNOWN_LABELS_LOWER = {label.lower() for label in UNKNOWN_COMPANY_LABELS}
 
 EXPORT_NAME_COLUMNS = (
+    "Name of Company",
     "Nazwa firmy",
     "Firma",
     "Nazwa Firmy",
@@ -1061,6 +1061,14 @@ def reply_status_label(status: str, lang: str = "pl") -> str:
             "auto_reply": "Auto",
             "bounce": "Bounce",
         }
+    elif lang == "en":
+        m = {
+            "replied_with_price": "Offer",
+            "replied_questions": "Questions",
+            "replied_no_price": "No price",
+            "auto_reply": "Auto",
+            "bounce": "Bounce",
+        }
     return m.get((status or "").strip().lower(), status or "")
 
 
@@ -1071,10 +1079,16 @@ def export_columns_from_contact(contact: dict, lang: str = "pl") -> dict[str, st
     has_r = "Tak" if has_meaningful_reply(rs) or contact.get("has_reply") else "Nie"
     if lang == "de":
         has_r = "Ja" if has_r == "Tak" else "Nein"
+    elif lang == "en":
+        has_r = "Yes" if has_r == "Tak" else "No"
     call = contact.get("call_needed")
     if call is None:
         call = compute_call_needed(contact, DEFAULT_NO_REPLY_HOURS)
     call_l = "TAK" if call else ""
+    if lang == "en":
+        call_l = "YES" if call else ""
+    elif lang == "de":
+        call_l = "JA" if call else ""
     rel_prices = contact.get("price_rel") or {}
     desc = (contact.get("reply_description") or "").strip()
     if isinstance(rel_prices, dict) and rel_prices:
@@ -1089,6 +1103,13 @@ def export_columns_from_contact(contact: dict, lang: str = "pl") -> dict[str, st
             if is_user_marked_read(contact)
             else ("Nein" if needs_int else "")
         )
+    elif lang == "en":
+        int_lbl = "YES" if needs_int else ""
+        read_lbl = (
+            "Yes"
+            if is_user_marked_read(contact)
+            else ("No" if needs_int else "")
+        )
     else:
         int_lbl = "TAK" if needs_int else ""
         read_lbl = (
@@ -1096,6 +1117,25 @@ def export_columns_from_contact(contact: dict, lang: str = "pl") -> dict[str, st
             if is_user_marked_read(contact)
             else ("Nie" if needs_int else "")
         )
+    if lang == "en":
+        row = {
+            "Email status": (contact.get("email_status") or "").strip(),
+            "Sent": sent,
+            "Reply": has_r,
+            "Reply status": reply_status_label(rs, lang) if rs else "",
+            "Needs action": int_lbl,
+            "Marked read": read_lbl,
+            "Price": (contact.get("price_main") or "").strip(),
+            "Currency": (contact.get("price_currency") or "").strip(),
+            "Description": sanitize_special_text(desc)[:500],
+            "All prices": (contact.get("prices_all") or "").strip(),
+            "Price source": (contact.get("price_source") or "").strip(),
+            "Call?": call_l,
+        }
+        for i, rk in enumerate(("rel_1", "rel_2", "rel_3"), start=1):
+            col = f"Price lane {i}"
+            row[col] = rel_prices.get(rk, "") if isinstance(rel_prices, dict) else ""
+        return row
     row = {
         "Status maila": (contact.get("email_status") or "").strip(),
         "Wysłano": sent,
@@ -1938,24 +1978,25 @@ def _is_mfg_signature_text(text: str) -> bool:
 
 
 def normalize_signature_for_pl(signature: str) -> str:
-    """Przypomnienia do firm PL — stopka zgodna ze swinczakdata.pl."""
+    """Przypomnienia do firm PL — podpis bez telefonu i bez strony www."""
     sig = (signature or "").strip()
     if not sig or _is_mfg_signature_text(sig):
         return SIGNATURE_PL
-    if "swinczakdata" in sig.lower() or "516513965" in sig:
-        return sig
     lines = sig.splitlines()
     out: list[str] = []
     for line in lines:
-        if _is_mfg_signature_text(line) or "kanbud" in line.lower():
-            if "swinczakdata" not in "\n".join(out).lower():
-                out.extend(["Maksym Swinczak", "https://swinczakdata.pl", "tel. 516513965"])
+        low = line.lower()
+        if "swinczakdata" in low or "516513965" in re.sub(r"\s+", "", line):
             continue
-        if "mfg-fliesen" in line.lower() or line.strip().lower().startswith("www:"):
+        if _is_mfg_signature_text(line) or "kanbud" in low:
+            continue
+        if "mfg-fliesen" in low or line.strip().lower().startswith("www:"):
+            continue
+        if re.search(r"\btel\.?\b", low) and re.search(r"\d{6,}", line):
             continue
         out.append(line)
     merged = "\n".join(out).strip()
-    return merged if merged and "516513965" in merged else SIGNATURE_PL
+    return merged if merged else SIGNATURE_PL
 
 
 def _reminder_from_line(lang: str) -> str:
@@ -2455,10 +2496,19 @@ def write_excel_with_reply_styles(
             enriched = []
             for row in rows:
                 r = normalize_row_dict(dict(row))
-                em = (r.get(config.email_column) or r.get("E-mail") or "").strip()
+                em = (
+                    r.get(config.email_column)
+                    or r.get("E-Mail")
+                    or r.get("E-mail")
+                    or ""
+                ).strip()
                 contact = find_contact_by_export_email(cache, em) if em else None
                 if contact:
-                    extra = export_columns_from_contact(contact, config.lang)
+                    extra = (
+                        export_columns_from_contact(contact, config.lang)
+                        if config.include_reply_export_columns
+                        else {}
+                    )
                     for k, v in extra.items():
                         if k not in r or not str(r.get(k, "")).strip():
                             r[k] = v

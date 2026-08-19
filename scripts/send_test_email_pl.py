@@ -42,7 +42,7 @@ def main() -> int:
         "company_name": args.company,
         "company_name_clean": args.company,
         "url": "https://example-bud.pl",
-        "wojewodztwo": "guangdong",
+        "wojewodztwo": "mazowieckie",
         "adres": "ul. Testowa 1, 00-001 Warszawa",
         "page_snippet": "Generalny wykonawca — budownictwo mieszkaniowe i komercyjne.",
     }

@@ -31,6 +31,8 @@ from cn_materialy_supplier_filter import (
 )
 from cn_province_keywords import (
     ALL_PROVINCES,
+    MATERIAL_CATEGORIES_ROTATION,
+    MATERIAL_CATEGORY_KEYWORDS,
     SERPER_DISCOVERY_BROAD_TERMS,
     SERPER_DISCOVERY_FALLBACK_TERMS,
     SERPER_DISCOVERY_LANDKREIS_TERMS,
@@ -55,15 +57,33 @@ class WojewodztwoCoverageRegression(unittest.TestCase):
         self.assertEqual(len(scraper.CAMPAIGN_ACTIVE_BUNDESLAENDER), 16)
 
     def test_countrywide_region_suffix(self):
-        self.assertEqual(build_region_suffix(list(ALL_PROVINCES)), "中国")
-        self.assertEqual(build_region_suffix(["guangdong", "zhejiang"]), "中国 GD ZJ")
+        self.assertEqual(build_region_suffix(list(ALL_PROVINCES)), "Polska")
+        self.assertEqual(build_region_suffix(["mazowieckie", "malopolskie"]), "Polska MZ MA")
 
-    def test_discovery_terms_chinese(self):
-        terms = build_discovery_terms(["guangdong"], max_terms=10)
+    def test_discovery_terms_polish_distributors(self):
+        terms = build_discovery_terms(["mazowieckie"], max_terms=10)
         self.assertGreaterEqual(len(terms), 5)
         joined = " ".join(terms)
-        self.assertIn("经销商", joined)
-        self.assertIn("佛山", joined)
+        self.assertIn("dystrybutor", joined)
+        self.assertTrue("Warszawa" in joined or "importer" in joined or "oficjalny" in joined)
+
+    def test_material_keywords_steel_doors_sanitary(self):
+        rotation = " ".join(MATERIAL_CATEGORIES_ROTATION).lower()
+        keywords = " ".join(MATERIAL_CATEGORY_KEYWORDS).lower()
+        for needle in (
+            "stal konstrukcyjna",
+            "stal nierdzewna",
+            "drzwi",
+            "kabiny prysznicowe",
+            "instalacje sanitarne",
+            "armatura łazienkowa",
+        ):
+            self.assertIn(needle, rotation)
+            self.assertIn(needle, keywords)
+        terms = " ".join(build_discovery_terms(["mazowieckie"], max_terms=80)).lower()
+        self.assertTrue("stal" in terms)
+        self.assertTrue("drzwi" in terms)
+        self.assertTrue("prysznic" in terms or "sanitar" in terms or "łazienk" in terms)
 
     def test_discovery_waves_exported(self):
         self.assertGreaterEqual(len(SERPER_DISCOVERY_FALLBACK_TERMS), 5)
@@ -74,10 +94,10 @@ class WojewodztwoCoverageRegression(unittest.TestCase):
 
 
 class SerperConfigRegression(unittest.TestCase):
-    def test_serper_cn_locale(self):
-        self.assertEqual(scraper.SERPER_COUNTRY, "cn")
-        self.assertEqual(scraper.SERPER_LANGUAGE, "zh-cn")
-        self.assertEqual(scraper.COUNTRY_RESTRICTION, "CN")
+    def test_serper_pl_locale(self):
+        self.assertEqual(scraper.SERPER_COUNTRY, "pl")
+        self.assertEqual(scraper.SERPER_LANGUAGE, "pl")
+        self.assertEqual(scraper.COUNTRY_RESTRICTION, "PL")
 
     def test_max_discovery_terms_scale(self):
         self.assertGreaterEqual(default_max_discovery_terms_for(list(ALL_PROVINCES)), 1000)
@@ -87,10 +107,10 @@ class SupplierFilterRegression(unittest.TestCase):
     def test_accepts_building_supplier(self):
         self.assertTrue(
             is_valid_retail_store_builder_contact(
-                email="info@foshan-tile.cn",
-                url="https://www.foshan-tile.cn/",
-                name="佛山市建材经销商有限公司",
-                text="瓷砖 卫浴 批发 经销商 产品目录 价格表 现货",
+                email="info@plytki-dystrybucja.pl",
+                url="https://www.plytki-dystrybucja.pl/",
+                name="Warszawski Dystrybutor Płytek Sp. z o.o.",
+                text="płytki ceramika importer dystrybutor katalog cennik asortyment",
             )
         )
 
@@ -104,21 +124,47 @@ class SupplierFilterRegression(unittest.TestCase):
             )
         )
 
+    def test_accepts_steel_and_bathroom_distributors(self):
+        self.assertTrue(
+            is_valid_retail_store_builder_contact(
+                email="biuro@stal-import.pl",
+                url="https://www.stal-import.pl/",
+                name="Śląski Dystrybutor Stali Sp. z o.o.",
+                text="stal nierdzewna blacha stalowa importer dystrybutor katalog cennik",
+            )
+        )
+        self.assertTrue(
+            is_valid_retail_store_builder_contact(
+                email="info@drzwi-hurt.pl",
+                url="https://www.drzwi-hurt.pl/",
+                name="Poznański Dystrybutor Drzwi Sp. z o.o.",
+                text="drzwi wewnętrzne drzwi stalowe kabiny prysznicowe dystrybutor hurt asortyment",
+            )
+        )
+        self.assertTrue(
+            is_valid_retail_store_builder_contact(
+                email="kontakt@lazienki-import.pl",
+                url="https://www.lazienki-import.pl/",
+                name="Krakowski Importer Armatury Łazienkowej Sp. z o.o.",
+                text="instalacje sanitarne armatura łazienkowa importer dystrybutor katalog",
+            )
+        )
+
     def test_loose_serper_candidate(self):
         self.assertTrue(
             is_loose_serper_discovery_candidate(
-                url="https://foshan-tile.cn",
-                name="佛山建材经销商",
-                text="瓷砖 批发 经销商",
+                url="https://plytki-dystrybucja.pl",
+                name="Warszawski Dystrybutor Płytek",
+                text="płytki dystrybutor importer",
             )
         )
 
     def test_serper_only_pending(self):
         self.assertTrue(
             is_serper_only_pending_candidate(
-                name="佛山瓷砖经销商",
-                url="https://foshan-tile.cn",
-                text="瓷砖 批发 经销商",
+                name="Warszawski Dystrybutor Płytek",
+                url="https://plytki-dystrybucja.pl",
+                text="płytki dystrybutor importer",
             )
         )
 
@@ -126,12 +172,15 @@ class SupplierFilterRegression(unittest.TestCase):
 class EmailBrandingRegression(unittest.TestCase):
     def test_default_phone(self):
         self.assertEqual(DEFAULT_INQUIRY_PHONE_CN, "516513965")
-        self.assertIn("516513965", build_inquiry_signature_zh())
+        self.assertNotIn("516513965", build_inquiry_signature_zh())
+        self.assertNotIn("swinczakdata", build_inquiry_signature_zh().lower())
 
-    def test_chinese_template(self):
+    def test_polish_template(self):
         body = build_fixed_material_inquiry_zh()
-        self.assertIn("尊敬的", body)
-        self.assertIn("经销商", body)
+        self.assertIn("Szanowni Państwo", body)
+        self.assertIn("dystrybutor", body)
+        self.assertIn("drzwi", body)
+        self.assertIn("kabiny prysznicowe", body)
         self.assertNotIn("+380", body)
 
     @patch("mail_transport.send_smtp_email")
@@ -173,7 +222,7 @@ class CampaignPathsRegression(unittest.TestCase):
         self.assertTrue(str(paths["output_file"]).endswith("cn_materialy_kontakte.xlsx"))
 
     def test_cn_drive_folder_id(self):
-        self.assertEqual(GOOGLE_DRIVE_CN_FOLDER_ID, "")
+        self.assertEqual(GOOGLE_DRIVE_CN_FOLDER_ID, "1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC")
 
 
 if __name__ == "__main__":

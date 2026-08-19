@@ -1,196 +1,312 @@
 # -*- coding: utf-8 -*-
 """
-Słowniki kampanii CN — hurtownie / składy / producenci materiałów budowlanych.
-Frazy Serper per prowincjio; rotacja kategorii materiałów.
+Słowniki kampanii CN — dystrybutorzy / importerzy na terenie Polski materiałów budowlanych.
+Frazy Serper per województwo; rotacja kategorii materiałów.
 """
 from __future__ import annotations
 
 SUPPLIER_ROLE_KEYWORDS: tuple[str, ...] = (
-    "建材经销商",
-    "建材代理商",
-    "建材进口商",
-    "建材批发",
-    "官方代理",
-    "一级代理",
-    "建材批发市场",
-    "工程经销商",
-    "外贸经销商",
-    "B2B 批发",
+    "importer",
+    "dystrybutor",
+    "wyłączny dystrybutor",
+    "oficjalny dystrybutor",
+    "autoryzowany dystrybutor",
+    "wyłączny importer",
+    "oficjalny importer",
+    "przedstawiciel",
+    "agent",
+    "hurt",
+    "dystrybucja",
+    "import",
 )
 
 MATERIAL_CATEGORY_KEYWORDS: tuple[str, ...] = (
-    "瓷砖",
-    "陶瓷",
-    "卫浴",
-    "洁具",
-    "灯具",
-    "LED灯",
-    "铝型材",
-    "五金",
-    "地板",
-    "SPC地板",
-    "涂料",
-    "防水材料",
-    "管材",
-    "钢材",
-    "水泥",
-    "PVC窗",
-    "门窗",
-    "胶粘剂",
-    "保温材料",
-    "石材",
+    "płytki",
+    "ceramika",
+    "armatura",
+    "LED",
+    "oświetlenie LED",
+    "SPC",
+    "panele SPC",
+    "profile aluminiowe",
+    "aluminium",
+    "chemia budowlana",
+    "okna PVC",
+    "PVC",
+    "stal",
+    "stal konstrukcyjna",
+    "stal nierdzewna",
+    "stal ocynkowana",
+    "stal zbrojeniowa",
+    "blacha stalowa",
+    "blachy stalowe",
+    "rury stalowe",
+    "profile stalowe",
+    "pręty stalowe",
+    "kształtowniki stalowe",
+    "belki stalowe",
+    "drzwi",
+    "drzwi wewnętrzne",
+    "drzwi zewnętrzne",
+    "drzwi wejściowe",
+    "drzwi stalowe",
+    "drzwi aluminiowe",
+    "drzwi drewniane",
+    "drzwi PVC",
+    "ościeżnice",
+    "kabiny prysznicowe",
+    "kabina prysznicowa",
+    "drzwi prysznicowe",
+    "brodziki",
+    "natryski",
+    "instalacje sanitarne",
+    "armatura łazienkowa",
+    "ceramika łazienkowa",
+    "baterie łazienkowe",
+    "hydraulika",
+    "umywalki",
+    "wanny",
+    "toalety",
+    "stelaże WC",
+    "sanitariat",
+    "ceramika sanitarna",
+    "płytki ceramiczne",
 )
 
 REQUIRED_MATERIAL_CATEGORY_KEYWORDS = MATERIAL_CATEGORY_KEYWORDS
 
 MATERIAL_SUPPLY_KEYWORDS = SUPPLIER_ROLE_KEYWORDS
 MATERIAL_TRADE_ACTIVITY_KEYWORDS = (
-    "产品目录",
-    "价格表",
-    "批发价",
-    "现货",
-    "库存",
-    "厂家直销",
-    "发货",
-    "工程供货",
+    "katalog",
+    "cennik",
+    "ceny",
+    "asortyment",
+    "dostępność",
+    "program magazynowy",
+    "dostawa po polsce",
+    "odbiór osobisty",
 )
 MATERIAL_CATALOG_KEYWORDS = (
-    "产品中心",
-    "产品展示",
-    "产品目录",
-    "批发",
-    "价格",
+    "katalog produktów",
+    "nasz asortyment",
+    "produkty",
+    "cennik",
+    "ceny",
 )
 MATERIAL_URL_PRIORITY_KEYWORDS = (
-    "联系我们",
+    "kontakt",
     "contact",
-    "关于我们",
-    "about",
-    "产品中心",
-    "产品",
+    "produkty",
+    "katalog",
+    "asortyment",
+    "cennik",
+    "ceny",
 )
 IMPRESSUM_GUESS_PATHS = (
+    "/kontakt",
     "/contact",
+    "/o-firmie",
     "/about",
-    "/contact-us",
-    "/about-us",
-    "/联系我们",
-    "/关于我们",
+    "/impressum",
 )
 SUPPLIER_CONTACT_LINK_KEYWORDS = (
-    "联系我们",
-    "联系方式",
+    "kontakt",
+    "napisz do nas",
     "email",
     "e-mail",
-    "电话",
-    "询价",
-    "留言",
+    "telefon",
+    "zamów",
+    "zapytanie",
 )
 SERPER_POSITIVE_TERMS = (
     *SUPPLIER_ROLE_KEYWORDS,
-    *MATERIAL_CATEGORY_KEYWORDS[:20],
+    *(k.lower() for k in MATERIAL_CATEGORY_KEYWORDS),
 )
 PL_PLACE_MARKERS: tuple[str, ...] = ()
 PL_RURAL_HINTS: tuple[str, ...] = ()
 LARGE_COMPANY_DOMAINS_EXTRA: frozenset[str] = frozenset()
 LARGE_COMPANY_NAME_MARKERS_EXTRA: tuple[str, ...] = ()
 SMALL_COMPANY_PAGE_MARKERS_EXTRA: tuple[str, ...] = (
-    "有限公司",
-    "厂家",
-    "工厂",
-    "私营",
-    "实业",
-    "贸易",
+    "rodzinna firma",
+    "firma rodzinna",
+    "sp. z o.o.",
+    "spółka z ograniczoną odpowiedzialnością",
+    "regionalny",
+    "lokalny",
 )
 SMALL_COMPANY_DISCOVERY_TERMS_EXTRA: tuple[str, ...] = (
-    "厂家直销",
-    "工厂直销",
-    "本地经销商",
+    "regionalny dystrybutor",
+    "lokalny importer",
+    "wyłączny dystrybutor",
 )
 
 MATERIAL_CATEGORIES_ROTATION = (
-    "瓷砖",
-    "卫浴",
-    "灯具",
-    "铝型材",
-    "五金",
-    "地板",
-    "涂料",
-    "钢材",
-    "水泥",
-    "管材",
-    "石材",
-    "防水材料",
+    "płytki",
+    "stal",
+    "drzwi",
+    "kabiny prysznicowe",
+    "ceramika",
+    "stal konstrukcyjna",
+    "drzwi wewnętrzne",
+    "instalacje sanitarne",
+    "armatura",
+    "stal nierdzewna",
+    "drzwi zewnętrzne",
+    "armatura łazienkowa",
+    "LED",
+    "blacha stalowa",
+    "drzwi stalowe",
+    "ceramika łazienkowa",
+    "SPC",
+    "rury stalowe",
+    "drzwi aluminiowe",
+    "baterie łazienkowe",
+    "profile aluminiowe",
+    "profile stalowe",
+    "drzwi wejściowe",
+    "brodziki",
+    "chemia budowlana",
+    "pręty stalowe",
+    "ościeżnice",
+    "umywalki",
+    "okna PVC",
+    "stal ocynkowana",
+    "drzwi prysznicowe",
+    "wanny",
+    "sanitariat",
+    "stal zbrojeniowa",
+    "hydraulika",
+    "ceramika sanitarna",
+    "kształtowniki stalowe",
+    "drzwi drewniane",
+    "stelaże WC",
 )
 
 CHAIN_SIMPLE_TERM_TEMPLATES = (
-    "{city} {material} 经销商",
-    "{city} {material} 代理商",
-    "{city} {material} 进口商",
-    "{city} {material} 批发",
-    "{city} 建材经销商 {material}",
-    "官方代理 {material} {city}",
-    "{city} {material} 工程经销商",
-    "{city} {material} 外贸批发",
+    "{city} dystrybutor {material}",
+    "{city} importer {material}",
+    "{city} wyłączny dystrybutor {material}",
+    "{city} oficjalny dystrybutor {material}",
+    "{city} hurtownia {material}",
+    "dystrybutor {material} {city} Polska",
+    "importer {material} {city}",
+    "wyłączny dystrybutor {material} {city}",
+    "oficjalny dystrybutor {material} Polska",
+    "hurtownia {material} {city} Polska",
 )
 
 SIMPLE_TERM_TEMPLATES = CHAIN_SIMPLE_TERM_TEMPLATES
 
 TERM_TEMPLATES = (
-    "{city} {oblast} {material} 经销商",
-    "{city} {material} 一级代理",
-    "{oblast} {material} 进口代理",
-    "{city} {material} 批发市场",
-    "官方经销商 {material} {city}",
-    "{city} {material} B2B 批发",
+    "dystrybutor {material} {city} {oblast}",
+    "importer {material} {city} {oblast}",
+    "wyłączny dystrybutor {material} {city}",
+    "oficjalny dystrybutor {material} {oblast}",
+    "hurt {material} dystrybutor {city}",
+    "hurtownia {material} {city} {oblast}",
+    "importer dystrybutor {material} {city} Polska",
 )
 
 SERPER_NEGATIVE_TERMS = (
-    "新闻",
-    "招聘",
-    "论坛",
-    "百科",
+    "olx",
+    "allegro",
+    "ogłoszenia",
+    "sklep",
+    "praca",
+    "oferty pracy",
+    "remont",
+    "remont mieszkań",
+    "wykończenia wnętrz",
+    "wiadomości",
+    "blog",
+    "forum",
+    "urząd",
+    "ministerstwo",
+    "portal",
+    "encyklopedia",
     "wikipedia",
-    "二手",
-    "闲置",
-    "装修公司",
-    "室内设计",
-    "银行",
-    "保险",
-    "酒店",
-    "旅游",
-    "政府",
-    "官网招聘",
+    "używane",
+    "biuro architektoniczne",
+    "bank",
+    "ubezpieczenia",
+    "restauracja",
+    "hotel",
 )
 
 PL_REGION_KEYWORDS = (
-    "中国",
-    "china",
-    "广东",
-    "浙江",
-    "江苏",
+    "polska",
+    "poland",
+    "polski",
 )
 
 COUNTRYWIDE_MAX_DISCOVERY_TERMS = 1500
 
 
 PROVINCE_CONFIG: dict[str, dict] = {
-    "guangdong": {"short": "GD", "cities": ("佛山", "广州", "深圳", "东莞", "中山", "珠海")},
-    "zhejiang": {"short": "ZJ", "cities": ("义乌", "杭州", "宁波", "温州", "嘉兴", "金华")},
-    "jiangsu": {"short": "JS", "cities": ("苏州", "无锡", "南京", "常州", "南通", "徐州")},
-    "shandong": {"short": "SD", "cities": ("青岛", "济南", "临沂", "潍坊", "烟台", "淄博")},
-    "shanghai": {"short": "SH", "cities": ("上海", "浦东", "嘉定", "松江", "青浦", "闵行")},
-    "fujian": {"short": "FJ", "cities": ("泉州", "厦门", "福州", "漳州", "莆田", "龙岩")},
-    "hebei": {"short": "HE", "cities": ("石家庄", "唐山", "保定", "邯郸", "廊坊", "沧州")},
-    "sichuan": {"short": "SC", "cities": ("成都", "绵阳", "德阳", "宜宾", "南充", "乐山")},
-    "henan": {"short": "HA", "cities": ("郑州", "洛阳", "南阳", "新乡", "许昌", "安阳")},
-    "hubei": {"short": "HB", "cities": ("武汉", "宜昌", "襄阳", "黄石", "荆州", "十堰")},
-    "beijing": {"short": "BJ", "cities": ("北京", "通州", "大兴", "昌平", "房山", "顺义")},
-    "tianjin": {"short": "TJ", "cities": ("天津", "滨海", "武清", "西青", "东丽", "北辰")},
-    "chongqing": {"short": "CQ", "cities": ("重庆", "渝北", "江津", "合川", "永川", "万州")},
-    "anhui": {"short": "AH", "cities": ("合肥", "芜湖", "蚌埠", "阜阳", "安庆", "马鞍山")},
-    "liaoning": {"short": "LN", "cities": ("沈阳", "大连", "鞍山", "营口", "锦州", "丹东")},
-    "jiangxi": {"short": "JX", "cities": ("南昌", "赣州", "九江", "上饶", "宜春", "景德镇")},
+    "mazowieckie": {
+        "short": "MZ",
+        "cities": ("Warszawa", "Radom", "Płock", "Siedlce", "Ostrołęka", "Pruszków"),
+    },
+    "malopolskie": {
+        "short": "MA",
+        "cities": ("Kraków", "Tarnów", "Nowy Sącz", "Oświęcim", "Chrzanów", "Wieliczka"),
+    },
+    "slaskie": {
+        "short": "SL",
+        "cities": ("Katowice", "Częstochowa", "Sosnowiec", "Gliwice", "Zabrze", "Bielsko-Biała"),
+    },
+    "wielkopolskie": {
+        "short": "WP",
+        "cities": ("Poznań", "Kalisz", "Konin", "Piła", "Leszno", "Gniezno"),
+    },
+    "dolnoslaskie": {
+        "short": "DS",
+        "cities": ("Wrocław", "Wałbrzych", "Legnica", "Jelenia Góra", "Lubin", "Głogów"),
+    },
+    "pomorskie": {
+        "short": "PM",
+        "cities": ("Gdańsk", "Gdynia", "Słupsk", "Tczew", "Wejherowo", "Starogard Gdański"),
+    },
+    "lodzkie": {
+        "short": "LD",
+        "cities": ("Łódź", "Piotrków Trybunalski", "Pabianice", "Zgierz", "Skierniewice", "Kutno"),
+    },
+    "zachodniopomorskie": {
+        "short": "ZP",
+        "cities": ("Szczecin", "Koszalin", "Stargard", "Kołobrzeg", "Świnoujście", "Police"),
+    },
+    "lubelskie": {
+        "short": "LU",
+        "cities": ("Lublin", "Zamość", "Chełm", "Biała Podlaska", "Puławy", "Świdnik"),
+    },
+    "podkarpackie": {
+        "short": "PK",
+        "cities": ("Rzeszów", "Przemyśl", "Stalowa Wola", "Mielec", "Tarnobrzeg", "Krosno"),
+    },
+    "kujawsko-pomorskie": {
+        "short": "KP",
+        "cities": ("Bydgoszcz", "Toruń", "Włocławek", "Grudziądz", "Inowrocław", "Brodnica"),
+    },
+    "warminsko-mazurskie": {
+        "short": "WN",
+        "cities": ("Olsztyn", "Elbląg", "Ełk", "Iława", "Ostróda", "Giżycko"),
+    },
+    "swietokrzyskie": {
+        "short": "SK",
+        "cities": ("Kielce", "Ostrowiec Świętokrzyski", "Starachowice", "Sandomierz", "Końskie"),
+    },
+    "podlaskie": {
+        "short": "PD",
+        "cities": ("Białystok", "Suwałki", "Łomża", "Augustów", "Hajnówka", "Grajewo"),
+    },
+    "lubuskie": {
+        "short": "LB",
+        "cities": ("Zielona Góra", "Gorzów Wielkopolski", "Żary", "Nowa Sól", "Świebodzin"),
+    },
+    "opolskie": {
+        "short": "OP",
+        "cities": ("Opole", "Kędzierzyn-Koźle", "Nysa", "Brzeg", "Kluczbork", "Prudnik"),
+    },
 }
 
 ALL_PROVINCES: tuple[str, ...] = tuple(PROVINCE_CONFIG.keys())
@@ -218,47 +334,25 @@ def default_max_discovery_terms_for(active: list[str] | None = None) -> int:
 def _normalize_wojewodztwo_key(name: str) -> str:
     n = (name or "").strip()
     aliases = {
-        "guangdong": "guangdong",
-        "广东": "guangdong",
-        "foshan": "guangdong",
-        "佛山": "guangdong",
-        "广州": "guangdong",
-        "zhejiang": "zhejiang",
-        "浙江": "zhejiang",
-        "义乌": "zhejiang",
-        "杭州": "zhejiang",
-        "jiangsu": "jiangsu",
-        "江苏": "jiangsu",
-        "shandong": "shandong",
-        "山东": "shandong",
-        "shanghai": "shanghai",
-        "上海": "shanghai",
-        "fujian": "fujian",
-        "福建": "fujian",
-        "hebei": "hebei",
-        "河北": "hebei",
-        "sichuan": "sichuan",
-        "四川": "sichuan",
-        "henan": "henan",
-        "河南": "henan",
-        "hubei": "hubei",
-        "湖北": "hubei",
-        "beijing": "beijing",
-        "北京": "beijing",
-        "tianjin": "tianjin",
-        "天津": "tianjin",
-        "chongqing": "chongqing",
-        "重庆": "chongqing",
-        "anhui": "anhui",
-        "安徽": "anhui",
-        "liaoning": "liaoning",
-        "辽宁": "liaoning",
-        "jiangxi": "jiangxi",
-        "江西": "jiangxi",
+        "mazowieckie": "mazowieckie",
+        "mazowsze": "mazowieckie",
+        "warszawa": "mazowieckie",
+        "malopolskie": "malopolskie",
+        "małopolskie": "malopolskie",
+        "krakow": "malopolskie",
+        "kraków": "malopolskie",
+        "slaskie": "slaskie",
+        "śląskie": "slaskie",
+        "katowice": "slaskie",
+        "wielkopolskie": "wielkopolskie",
+        "poznan": "wielkopolskie",
+        "poznań": "wielkopolskie",
+        "dolnoslaskie": "dolnoslaskie",
+        "dolnośląskie": "dolnoslaskie",
+        "wroclaw": "dolnoslaskie",
+        "wrocław": "dolnoslaskie",
     }
     low = n.lower()
-    if n in aliases:
-        return aliases[n]
     if low in aliases:
         return aliases[low]
     for key in PROVINCE_CONFIG:
@@ -335,11 +429,11 @@ def build_discovery_terms(
                     return terms
     if len(oblasts) >= 8:
         countrywide = (
-            "中国 {material} 经销商",
-            "中国 {material} 代理商",
-            "中国 {material} 进口商",
-            "中国 {material} 批发",
-            "建材 {material} 外贸批发",
+            "dystrybutor {material} Polska",
+            "importer {material} Polska",
+            "wyłączny dystrybutor {material} Polska",
+            "oficjalny dystrybutor {material} Polska",
+            "importer dystrybutor {material} Polska -sklep -ogłoszenia -allegro -olx",
         )
         for tmpl in countrywide:
             material = _rotating_material(material_counter)
@@ -362,9 +456,9 @@ def build_raion_discovery_terms(active: list[str] | None = None) -> list[str]:
         short = PROVINCE_CONFIG[oblast]["short"]
         for city in PROVINCE_CONFIG[oblast]["cities"][:6]:
             for tmpl in (
-                "{city} {material} 经销商",
-                "{city} {short} {material} 代理商",
-                "{city} {material} 批发市场",
+                "dystrybutor {material} {city} okolice",
+                "importer {material} {city} {short}",
+                "wyłączny dystrybutor {material} {city}",
             ):
                 material = _rotating_material(material_counter)
                 _append_unique_term(
@@ -377,7 +471,7 @@ def build_raion_discovery_terms(active: list[str] | None = None) -> list[str]:
         _append_unique_term(
             terms,
             seen,
-            f"{oblast} {material} 经销商",
+            f"dystrybutor {material} {oblast} Polska",
             max_terms=10_000,
         )
     return terms
@@ -394,10 +488,10 @@ def build_places_discovery_terms(active: list[str] | None = None) -> list[str]:
     for oblast in oblasts:
         for city in PROVINCE_CONFIG[oblast]["cities"][:8]:
             for tmpl in (
-                "{city} {material} 经销商",
-                "{city} {material} 批发",
-                "{city} {material} 厂家",
-                "{city} 建材市场 {material}",
+                "dystrybutor {material} {city}",
+                "importer {material} {city}",
+                "oficjalny dystrybutor {material} {city}",
+                "wyłączny dystrybutor {material} {city}",
             ):
                 material = _rotating_material(material_counter)
                 _append_unique_term(
@@ -410,7 +504,7 @@ def build_places_discovery_terms(active: list[str] | None = None) -> list[str]:
         _append_unique_term(
             terms,
             seen,
-            f"{oblast} {material} 批发",
+            f"importer {material} {oblast}",
             max_terms=10_000,
         )
     return terms
@@ -425,9 +519,9 @@ def build_broad_discovery_terms(active: list[str] | None = None) -> list[str]:
         short = PROVINCE_CONFIG[oblast]["short"]
         for city in PROVINCE_CONFIG[oblast]["cities"]:
             for tmpl in (
-                "{city} {material} 经销商",
-                "{city} {material} 代理商",
-                "{city} {material} 进口商",
+                "dystrybutor {material} {city}",
+                "importer {material} {city}",
+                "oficjalny dystrybutor {material} {city}",
             ):
                 material = _rotating_material(material_counter)
                 _append_unique_term(
@@ -437,9 +531,9 @@ def build_broad_discovery_terms(active: list[str] | None = None) -> list[str]:
                     max_terms=10_000,
                 )
         for tmpl in (
-            "{oblast} {material} 经销商",
-            "{oblast} {material} 批发",
-            "{short} {material} 外贸",
+            "dystrybutor {material} {oblast}",
+            "importer {material} {oblast}",
+            "wyłączny dystrybutor {material} {short}",
         ):
             material = _rotating_material(material_counter)
             _append_unique_term(
@@ -454,11 +548,11 @@ def build_broad_discovery_terms(active: list[str] | None = None) -> list[str]:
 def build_region_suffix(active: list[str] | None = None) -> str:
     oblasts = resolve_active_provinces(active)
     if len(oblasts) <= 1:
-        return "中国"
+        return "Polska"
     if len(oblasts) >= 4:
-        return "中国"
+        return "Polska"
     shorts = " ".join(PROVINCE_CONFIG[o]["short"] for o in oblasts[:4])
-    return f"中国 {shorts}"
+    return f"Polska {shorts}"
 
 
 def configure_campaign_provinces(
@@ -496,18 +590,18 @@ def build_fallback_terms(active: list[str] | None = None) -> list[str]:
     for oblast in oblasts:
         short = PROVINCE_CONFIG[oblast]["short"]
         for tmpl in (
-            "{oblast} {material} 经销商",
-            "{short} {material} 代理商",
-            "{oblast} {material} 批发",
-            "{oblast} {material} 进口商",
+            "dystrybutor {material} {oblast}",
+            "importer {material} {short}",
+            "wyłączny dystrybutor {material} {oblast}",
+            "oficjalny dystrybutor {material} {oblast}",
         ):
             material = _rotating_material(material_counter)
             fb.append(tmpl.format(oblast=oblast, short=short, material=material))
     for tmpl in (
-        "中国 {material} 经销商",
-        "中国 {material} 代理商",
-        "中国 {material} 进口商",
-        "中国建材 {material} 批发",
+        "dystrybutor {material} Polska",
+        "importer {material} Polska",
+        "wyłączny dystrybutor {material} Polska",
+        "oficjalny dystrybutor {material} Polska",
     ):
         material = _rotating_material(material_counter)
         fb.append(tmpl.format(material=material))

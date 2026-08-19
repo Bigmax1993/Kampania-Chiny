@@ -25,16 +25,26 @@ from cn_materialy_inquiry_email_zh import (
 class PlInquiryEmailTest(unittest.TestCase):
     def test_default_phone(self):
         self.assertEqual(DEFAULT_INQUIRY_PHONE_CN, "516513965")
-        self.assertIn("516513965", build_inquiry_signature_zh())
+        self.assertNotIn("516513965", build_inquiry_signature_zh())
+        self.assertNotIn("swinczakdata", build_inquiry_signature_zh().lower())
         self.assertEqual(inquiry_phone(), "516513965")
 
-    def test_chinese_template(self):
+    def test_polish_template(self):
         body = build_fixed_material_inquiry_zh()
-        self.assertIn("尊敬的", body)
-        self.assertIn("经销商", body)
-        self.assertIn("此致敬礼", body)
-        self.assertIn("516513965", body)
+        self.assertIn("Szanowni Państwo", body)
+        self.assertIn("dystrybutor", body)
+        self.assertIn("Z poważaniem", body)
+        self.assertNotIn("516513965", body)
+        self.assertNotIn("swinczakdata", body.lower())
         self.assertTrue("Maksym" in body or inquiry_sender_name() in body)
+
+    def test_fallback_is_personalized_per_company(self):
+        a = build_fixed_material_inquiry_zh("Alfa Ceramika Sp. z o.o.")
+        b = build_fixed_material_inquiry_zh("Beta LED Import Sp. z o.o.")
+        self.assertIn("Alfa Ceramika", a)
+        self.assertIn("Beta LED", b)
+        self.assertNotEqual(a, b)
+        self.assertNotIn("Alfa Ceramika", b)
 
     def test_no_ua_phone_in_signature(self):
         sig = build_inquiry_signature_zh()
@@ -47,16 +57,16 @@ class PlInquiryEmailTest(unittest.TestCase):
 
     def test_dedupe_double_signature(self):
         sig = build_inquiry_signature_zh()
-        body = f"尊敬的先生/女士：\n\n询价内容。\n\n{sig}\n\n{sig}"
+        body = f"Szanowni Państwo,\n\nTreść zapytania.\n\n{sig}\n\n{sig}"
         cleaned = dedupe_inquiry_signature(body)
-        self.assertEqual(cleaned.count("此致敬礼"), 1)
+        self.assertEqual(cleaned.count("Z poważaniem"), 1)
         self.assertEqual(cleaned.count("Maksym"), 1)
 
     def test_ensure_does_not_append_when_present(self):
         sig = build_inquiry_signature_zh()
-        body = f"尊敬的先生/女士：\n\n询价。\n\n{sig}"
+        body = f"Szanowni Państwo,\n\nZapytanie.\n\n{sig}"
         ensured = ensure_inquiry_signature(body)
-        self.assertEqual(ensured.count("此致敬礼"), 1)
+        self.assertEqual(ensured.count("Z poważaniem"), 1)
 
 
 if __name__ == "__main__":

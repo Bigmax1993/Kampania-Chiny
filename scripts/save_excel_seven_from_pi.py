@@ -154,7 +154,7 @@ def main() -> int:
     )
     scraper.save_cache(cache, logger)
 
-    names = [r.get("Nazwa firmy") or "" for r in export_rows]
+    names = [r.get("Name of Company") or r.get("Nazwa firmy") or "" for r in export_rows]
     print(f"Zapisano {len(export_rows)} firm w {scraper.OUTPUT_FILE}:")
     for i, name in enumerate(names, 1):
         print(f"  {i}. {name}")

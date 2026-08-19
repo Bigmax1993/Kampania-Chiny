@@ -7,6 +7,18 @@ from __future__ import annotations
 import re
 
 _PL_POSTAL_RE = re.compile(r"\b\d{2}-\d{3}\b")
+
+
+def extract_pl_postcode(*texts: str) -> str:
+    """Polski kod pocztowy XX-XXX z adresu, snippetu albo osobnego pola."""
+    for text in texts:
+        raw = str(text or "").strip()
+        if not raw:
+            continue
+        match = _PL_POSTAL_RE.search(raw)
+        if match:
+            return match.group(0)
+    return ""
 _PL_STREET_RE = re.compile(
     r"\b(?:ul\.?|ulica|al\.?|aleja|aleje|pl\.?|plac|os\.?|osiedle|"
     r"skwer|rondo|bulw\.?|bulwar)\b",
@@ -140,6 +152,38 @@ def looks_like_pl_physical_address(text: str) -> bool:
     return False
 
 
+def looks_like_usable_address_for_json_fill(text: str) -> bool:
+    """Luźniejszy adres przy uzupełnianiu Excela z JSON — bez marketingu."""
+    if looks_like_pl_physical_address(text):
+        return True
+    raw = " ".join((text or "").split()).strip()
+    if not raw or looks_like_marketing_text(raw):
+        return False
+    if len(raw) < 8 or len(raw) > 180:
+        return False
+    has_street = bool(_PL_STREET_RE.search(raw))
+    has_postal = bool(_PL_POSTAL_RE.search(raw))
+    has_digit = bool(re.search(r"\d", raw))
+    if has_street and (has_digit or len(raw.split()) >= 2):
+        return True
+    if has_postal:
+        return True
+    return False
+
+
+def extract_usable_address_for_json_fill(text: str) -> str:
+    found = extract_pl_address_from_text(text)
+    if found:
+        return found
+    if not (text or "").strip():
+        return ""
+    for chunk in re.split(r"[\n\r;|]+", text):
+        line = " ".join(chunk.split()).strip(" ,;-")
+        if looks_like_usable_address_for_json_fill(line):
+            return line[:180]
+    return ""
+
+
 def extract_pl_address_from_text(text: str) -> str:
     """Wyciąga pierwszy sensowny adres PL z bloku tekstu (Impressum/kontakt)."""
     if not (text or "").strip():
@@ -212,3 +256,48 @@ def serper_discovery_address(*, bucket: str, item: dict) -> str:
         return ""
     raw = (item.get("address") or "").strip()
     return sanitize_export_address(raw)
+
+
+_NIP_LABEL_RE = re.compile(
+    r"(?:NIP|VAT(?:\s*ID)?|Tax(?:\s*(?:ID|Identification)?\s*Number)?)[:\s]*"
+    r"(?:PL\s*)?(\d{3}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}|\d{10})",
+    re.IGNORECASE,
+)
+_PL_VAT_RE = re.compile(r"\bPL\s*(\d{10})\b", re.IGNORECASE)
+_NIP_WEIGHTS = (6, 5, 7, 2, 3, 4, 5, 6, 7)
+
+
+def normalize_pl_nip(raw: str) -> str:
+    digits = re.sub(r"\D", "", raw or "")
+    if len(digits) != 10:
+        return ""
+    return f"{digits[0:3]}-{digits[3:6]}-{digits[6:8]}-{digits[8:10]}"
+
+
+def pl_nip_checksum_ok(digits: str) -> bool:
+    d = re.sub(r"\D", "", digits or "")
+    if len(d) != 10 or not d.isdigit():
+        return False
+    total = sum(int(ch) * w for ch, w in zip(d[:9], _NIP_WEIGHTS))
+    check = total % 11
+    if check == 10:
+        return False
+    return check == int(d[9])
+
+
+def extract_pl_nip_from_text(text: str) -> str:
+    """NIP / Tax Identification Number z Impressum, stopki lub strony kontakt."""
+    blob = text or ""
+    if not blob.strip():
+        return ""
+    labeled = _NIP_LABEL_RE.search(blob)
+    if labeled:
+        nip = normalize_pl_nip(labeled.group(1))
+        if nip:
+            return nip
+    vat = _PL_VAT_RE.search(blob)
+    if vat:
+        nip = normalize_pl_nip(vat.group(1))
+        if nip and pl_nip_checksum_ok(nip):
+            return nip
+    return ""

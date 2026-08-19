@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Tekst maila — zapytanie ofertowe do hurtowni materiałów budowlanych (chiński).
-Domyślny telefon kontaktowy: 516513965 (+48).
+Tekst maila — zapytanie o współpracę dystrybucyjną do polskich importerów/dystrybutorów
+(produkt dla chińskich eksporterów). Maile bez telefonu i bez strony www.
 """
 from __future__ import annotations
 
@@ -71,7 +71,15 @@ def _clean_sender_display_name(raw: str) -> str:
 
 DEFAULT_INQUIRY_SENDER_NAME_CN = "Maksym Swinczak"
 DEFAULT_INQUIRY_PHONE_CN = "516513965"
-DEFAULT_INQUIRY_WEBSITE_CN = "https://swinczakdata.pl"
+DEFAULT_INQUIRY_WEBSITE_CN = ""
+_CAMPAIGN_PHONE_RE = re.compile(
+    r"(?:tel\.?\s*:?\s*)?(?:\+48\s*)?516[\s.\-/]*513[\s.\-/]*965\b",
+    re.IGNORECASE,
+)
+_CAMPAIGN_WEB_RE = re.compile(
+    r"https?://(?:www\.)?swinczakdata\.pl\S*|www\.swinczakdata\.pl\S*",
+    re.IGNORECASE,
+)
 
 
 def inquiry_sender_name() -> str:
@@ -102,23 +110,30 @@ def inquiry_phone() -> str:
 def inquiry_website() -> str:
     from scraper_env import get_env_value
 
-    web = get_env_value("INQUIRY_WEBSITE").strip()
-    return web or DEFAULT_INQUIRY_WEBSITE_CN
+    # Kampania CN: celowo bez strony w mailu (nawet jeśli env ma URL).
+    _ = get_env_value("INQUIRY_WEBSITE").strip()
+    return DEFAULT_INQUIRY_WEBSITE_CN
+
+
+def strip_campaign_contact_from_text(text: str) -> str:
+    """Usuwa numer i stronę kampanii, jeśli model je dokleił."""
+    if not text:
+        return ""
+    out = _CAMPAIGN_WEB_RE.sub("", text)
+    out = _CAMPAIGN_PHONE_RE.sub("", out)
+    lines = [re.sub(r"[ \t]+", " ", ln).strip(" ,;") for ln in out.splitlines()]
+    out = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
 
 
 def build_inquiry_signature_zh() -> str:
-    lines = ["此致敬礼", ""]
+    lines = ["Z poważaniem,", ""]
     name = inquiry_sender_name()
     if name:
         lines.append(name)
     company = inquiry_company_name()
     if company:
         lines.extend(["", company])
-    web = inquiry_website()
-    if web:
-        lines.extend(["", web])
-    phone = inquiry_phone()
-    lines.extend(["", f"Tel.: {phone}"])
     return "\n".join(lines).strip()
 
 
@@ -130,10 +145,8 @@ def body_has_inquiry_signature(body: str) -> bool:
     if not name:
         return False
     first = name.split()[0].lower()
-    phone = re.sub(r"\D", "", inquiry_phone())
     tail = low[-500:]
-    tail_digits = re.sub(r"\D", "", (body or "")[-500:])
-    return first in tail and phone in tail_digits
+    return first in tail
 
 
 def dedupe_inquiry_signature(body: str) -> str:
@@ -180,6 +193,7 @@ def format_inquiry_email_body_pl(body: str) -> str:
     if not body:
         return ""
     text = body.replace("\r\n", "\n").replace("\r", "\n").strip()
+    text = strip_campaign_contact_from_text(text)
     lines = [re.sub(r"[ \t]+", " ", ln).strip() for ln in text.split("\n")]
     text = "\n".join(lines)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
@@ -254,10 +268,6 @@ def _normalize_signature_lines_pl(text: str) -> str:
         name_lines = [ln.strip(" ,;") for ln in rest.splitlines() if ln.strip(" ,;")]
         parts = [marker]
         parts.extend(name_lines)
-        if web:
-            parts.append(web)
-        if tel:
-            parts.append(tel if tel.lower().startswith("tel") else f"Tel.: {tel}")
         signature = "\n".join(parts)
     if before:
         return f"{before}\n\n{signature}"
@@ -266,19 +276,17 @@ def _normalize_signature_lines_pl(text: str) -> str:
 
 def ensure_inquiry_contact_in_body(body: str) -> str:
     """
-    Uzupełnia brakujący telefon PL w podpisie.
-    Nie dokleja statycznego podpisu, jeśli Claude już dodał blok «Z poważaniem».
+    Czyści telefon i stronę z podpisu. Nie dokleja numeru ani URL.
     """
-    text = strip_legacy_branding_preserve_layout(
-        strip_foreign_phones_from_text((body or "").strip())
+    text = strip_campaign_contact_from_text(
+        strip_legacy_branding_preserve_layout(
+            strip_foreign_phones_from_text((body or "").strip())
+        )
     )
     if not text:
         return build_inquiry_signature_zh()
-    phone = inquiry_phone()
-    if phone in text:
-        return text
     if re.search(r"此致敬礼|z\s+powa[zż]aniem", text, flags=re.IGNORECASE):
-        return f"{text.rstrip()}\nTel.: {phone}"
+        return text
     return f"{text.rstrip()}\n\n{build_inquiry_signature_zh()}"
 
 
@@ -294,11 +302,10 @@ def strip_legacy_branding_preserve_layout(text: str) -> str:
 
 def build_inquiry_sender_brief_pl() -> str:
     company = inquiry_company_name()
-    who = company if company else "Analityk rynku materiałów budowlanych (B2B)"
+    who = company if company else "chiński producent / eksporter materiałów budowlanych"
     return (
-        f"{who} — zbieram informacje o ofertach hurtowych w ramach analizy rynku "
-        "i benchmarku dostawców (cement, piasek, żwir, bloczki, stal, styropian, "
-        "wełna, płyty GK, dachówki, zaprawy itd.). Szczegóły: https://swinczakdata.pl/dla-hurtowni.html"
+        f"{who} — poszukujemy dystrybutora / importera na terenie Polski. "
+        "Prosimy o kontakt w sprawie współpracy dystrybucyjnej."
     )
 
 
@@ -310,34 +317,34 @@ def build_sender_contact_line_pl() -> str:
     company = inquiry_company_name()
     if company:
         parts.append(company)
-    web = inquiry_website()
-    if web:
-        parts.append(web)
-    parts.append(f"Tel. {inquiry_phone()}")
     return strip_legacy_branding(", ".join(parts))
 
 
-def build_fixed_material_inquiry_zh() -> str:
+def build_fixed_material_inquiry_zh(company_name: str = "") -> str:
+    who = (company_name or "").strip()
     intro = (
-        "我们是来自波兰的采购方，正在寻找中国建材经销商、代理商和出口商合作。"
-        "请提供贵司批发供货能力与出口条件。"
+        "reprezentuję chińskiego producenta materiałów budowlanych i poszukujemy "
+        "dystrybutora / importera na terenie Polski."
     )
     if inquiry_company_name():
         intro = (
-            f"我代表 {inquiry_company_name()}，正在寻找中国建材经销商/代理商合作。"
-            "希望对比批发价格、现货与出口交货条件。"
+            f"reprezentuję {inquiry_company_name()} — chińskiego eksportera materiałów "
+            "budowlanych. Szukamy dystrybutora (w tym wyłącznego) na rynku polskim."
         )
-    return f"""尊敬的先生/女士：
+    recipient = (
+        f"Zwracam się do {who}."
+        if who
+        else "Zwracam się do Państwa jako do dystrybutora / importera."
+    )
+    return f"""Szanowni Państwo,
 
-{intro}
+{recipient} {intro}
 
-我们关注瓷砖、卫浴、灯具、铝型材、五金、地板、涂料、钢材、管材及相关建材。请提供批发价、现货情况和出口交货方式。
+Interesuje nas współpraca w kategoriach: płytki, ceramika, armatura, oświetlenie LED, panele SPC, profile aluminiowe, chemia budowlana, okna PVC, stal (w tym konstrukcyjna, nierdzewna, ocynkowana, blachy, rury i profile), drzwi, kabiny prysznicowe oraz instalacje sanitarne do łazienki. Szukamy partnera, który importuje lub dystrybuuje takie asortymenty w Polsce.
 
-B2B合作说明：https://swinczakdata.pl/dla-hurtowni.html
+Prosimy o kontakt do osoby odpowiedzialnej za import / dystrybucję albo o informację, czy rozważacie Państwo nową linię produktową z Chin.
 
-请发送最新价格表，或指定销售/外贸联系人。
-
-感谢配合。
+Dziękujemy za odpowiedź.
 
 {build_inquiry_signature_zh()}"""
 

@@ -1,49 +1,45 @@
-# Plan tygodniowy PL — +5h względem UA (brak nakładania pipeline)
+# Plan tygodniowy CN — GitHub Actions (Asia/Shanghai)
 
-Kampania **PL materiały budowlane** (`cn_materialy_scraper.py`, `run_config/cn_materialy.json`).
-Wysyłka **pon 14:00** + **wt 14:00** (2×300 maili/dzień). Maile po chińsku, tel. **516513965**.
+Kampania **CN**: polscy dystrybutorzy / importerzy (`cn_materialy_scraper.py`, `run_config/cn_materialy.json`).
 
-## Offset względem UA
+Wysyłka **pon 14:00** + **wt 14:00** (Shanghai): 2×300 maili/dzień. Maile po polsku, unikalne per firma, bez telefonu i bez strony www.
 
-Każdy etap PL startuje **5 godzin po** odpowiednim etapie UA. Po rozdzieleniu repozytoriów oba pipeline działają niezależnie (osobne repo, osobne secrets, osobny `cn-pipeline` / `ua-pipeline`).
-
-| Etap | UA (PL czas) | PL (+5h) |
-|------|--------------|----------|
-| Pon discovery | 17:00 | **22:00** |
-| Wt discovery | 15:00 | **20:00** |
-| Śr discovery | 19:00 (śr) | **00:00** (czw) |
-| Czw discovery | 20:00 (czw) | **01:00** (pt) |
-| Pt discovery | 16:00 | **21:00** |
-| Nd backfill | 05:30 | **10:30** |
-| Pon sync Drive | 06:00 | **11:00** |
-| Pon prep | 07:00 | **12:00** |
-| Pon send | 09:00 | **14:00** |
-| Wt send | 09:00 | **14:00** |
+Opis kampanii: [`docs/CN_MATERIALY.md`](../../docs/CN_MATERIALY.md)  
+Maile: [`docs/MAILE.md`](../../docs/MAILE.md)
 
 ## Cykl tygodniowy
 
 ```
-Tydzień N (discovery PL):
-  pon 22:00 → wt 20:00 → śr 00:00 → czw 01:00 → pt 21:00   [cn-materialy-wyniki-pi]
+Discovery (tydzień N):
+  pon 20:00 → wt 20:00 → śr 21:00 → czw 21:00 → pt 19:00
+  artefakt: cn-materialy-wyniki-pi
 
-Tydzień N-1 (backfill + wysyłka):
-  nd 10:30 → pon 11:00 sync → pon 12:00 prep → pon 14:00 send → wt 14:00 send
+Backfill + Drive + wysyłka:
+  nd 09:30 backfill (pobierz Excel z Drive → append → 2× JSON → ten sam plik na Drive)
+  pon 10:00 sync Drive
+  pon 11:00 prep (Excel → 2× JSON uzupełnienie → Drive)
+  pon 14:00 send partia 1
+  wt 14:00 send partia 2
 ```
 
-## GitHub Actions
+## Cron (Asia/Shanghai)
 
-| Workflow | Cron (Asia/Shanghai) |
-|----------|----------------------|
-| CN discovery | `0 22 * * 1`, `0 20 * * 2`, `0 0 * * 4`, `0 1 * * 5`, `0 21 * * 5` |
-| CN niedziela backfill | `30 10 * * 0` |
-| Sync Drive PL | `0 11 * * 1` |
-| CN poniedzialek prep | `0 12 * * 1` |
+| Workflow | Cron |
+|----------|------|
+| CN discovery | `0 20 * * 1`, `0 20 * * 2`, `0 21 * * 3`, `0 21 * * 4`, `0 19 * * 5` |
+| CN niedziela backfill | `30 9 * * 0` |
+| Sync Drive CN | `0 10 * * 1` |
+| CN poniedzialek prep | `0 11 * * 1` |
 | CN poniedzialek send | `0 14 * * 1` |
 | CN wtorek send | `0 14 * * 2` |
 
-Secret Drive: `GDRIVE_FOLDER_ID_CN` (utwórz folder CN na Drive i wklej ID do secretu).
+Secret Drive: `GDRIVE_FOLDER_ID_CN` = `1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC`
 
-Plik Excel: `cn_materialy_kontakte.xlsx` (wersjonowany z datą przy uploadzie).
+Folder: [CN Materialy — Google Drive](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC?usp=drive_link)
+
+Plik Excel: `cn_materialy_kontakte.xlsx`
+
+Concurrency: `cn-pipeline` — osobne repo, bez kolizji z PL/UA.
 
 ## Task Scheduler (Windows)
 

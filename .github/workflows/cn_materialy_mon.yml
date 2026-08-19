@@ -58,6 +58,31 @@ jobs:
         run: |
           python cn_materialy_scraper.py --run-config run_config/cn_materialy.json --rebuild-from-cache
 
+      - name: Verify Excel vs JSON and fill missing fields (pass 1)
+        run: |
+          python scripts/verify_excel_from_json.py --campaign cn --wyniki Wyniki --passes 2
+
+      - name: Verify Excel vs JSON and fill missing fields (pass 2)
+        run: |
+          python scripts/verify_excel_from_json.py --campaign cn --wyniki Wyniki --passes 2
+
+      - name: Install Google Drive dependencies
+        run: pip install -r requirements-drive.txt
+
+      - name: Upload filled Excel to Google Drive
+        env:
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID_CN }}
+          GDRIVE_VERSION_XLSX: "0"
+          GDRIVE_APPEND_XLSX: "1"
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_OAUTH_CLIENT_ID: ${{ secrets.GDRIVE_OAUTH_CLIENT_ID }}
+          GDRIVE_OAUTH_CLIENT_SECRET: ${{ secrets.GDRIVE_OAUTH_CLIENT_SECRET }}
+          GDRIVE_OAUTH_REFRESH_TOKEN: ${{ secrets.GDRIVE_OAUTH_REFRESH_TOKEN }}
+          GDRIVE_IMPERSONATE_EMAIL: ${{ secrets.GDRIVE_IMPERSONATE_EMAIL }}
+          GDRIVE_SHARED_DRIVE_ID: ${{ secrets.GDRIVE_SHARED_DRIVE_ID }}
+        run: |
+          python scripts/gdrive_upload_wyniki.py --campaign-dir . --campaign cn
+
       - name: Upload Wyniki artifact
         if: always()
         uses: actions/upload-artifact@v4

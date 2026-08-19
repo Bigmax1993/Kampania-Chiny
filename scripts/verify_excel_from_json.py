@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Niedzielny sync: weryfikuje Excel vs cache JSON, uzupelnia braki i zapisuje.
+Weryfikuje Excel vs cache JSON, uzupelnia braki i zapisuje plik.
+
+Dwa razy wczytuje *_cache.json z dysku, dwa razy uzupelnia luki w Excelu
+i dwa razy zapisuje xlsx. Na koncu jeszcze raz porownuje Excel z JSON.
 
 Walidacja przepuszcza z JSON pola potrzebne w Excelu (nazwa, e-mail, telefon,
 adres, wojewodztwo, www, URL) — bez filtra GU/retail.
-Po zapisie ponownie czyta caly plik; przy lukach znow JSON → uzupelnienie → zapis.
 """
 from __future__ import annotations
 
@@ -19,6 +21,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.excel_from_json_validate import (  # noqa: E402
     fill_export_from_json,
+    find_excel_gaps,
     json_contact_has_needed_data,
     merge_contacts_maps,
     pipeline_row_from_json,
@@ -30,7 +33,7 @@ from libs.scraper_email_replies import ReplySyncConfig, write_excel_with_reply_s
 CAMPAIGNS = {
     "cn": {
         "module": "cn_materialy_scraper",
-        "lang": "zh",
+        "lang": "pl",
         "campaign_id": "cn_materialy",
         "xlsx_name": "cn_materialy_kontakte.xlsx",
         "cache_glob": "*_cache.json",
@@ -59,7 +62,10 @@ def pipeline_row_as_info(row: dict) -> dict:
         "full_address": _cell(row.get("full_address") or row.get("adres")),
         "official_website": _cell(row.get("official_website") or row.get("www")),
         "bundesland": _cell(row.get("bundesland")),
-        "retail_chains_found": _cell(row.get("retail_chains_found")),
+        "retail_chains_found": _cell(row.get("retail_chains_found") or row.get("kategoria")),
+        "kategoria": _cell(row.get("kategoria") or row.get("line_of_business")),
+        "nip": _cell(row.get("nip") or row.get("tax_id")),
+        "kod_pocztowy": _cell(row.get("kod_pocztowy") or row.get("postcode")),
         "email_status": _cell(row.get("email_status")),
         "retail_verified": bool(row.get("retail_verified")),
         "is_gu": bool(row.get("is_gu")),
@@ -109,8 +115,10 @@ def write_sheets(
     cfg = ReplySyncConfig(
         cache_path=scraper.CACHE_FILE,
         xlsx_path=xlsx,
-        lang=spec["lang"],
+        lang="en",
         campaign_id=spec["campaign_id"],
+        email_column="E-Mail",
+        include_reply_export_columns=False,
     )
     write_excel_with_reply_styles(
         xlsx,
@@ -125,72 +133,197 @@ def write_sheets(
     )
 
 
-def verify_and_save(scraper, spec: dict, contacts: dict, xlsx: Path, cache: dict, logger) -> tuple[int, list[dict]]:
+JSON_RELOAD_PASSES = 2
+
+
+def fill_excel_from_contacts(
+    scraper,
+    spec: dict,
+    contacts: dict,
+    xlsx: Path,
+    cache: dict,
+    logger,
+    *,
+    pass_label: str,
+) -> tuple[int, list[dict]]:
+    """Jedna runda: JSON → luki w Excelu → uzupelnienie → zapis → odczyt z dysku."""
     pipeline_rows = [pipeline_row_from_json(url, info) for url, info in contacts.items()]
     export_rows = scraper.build_export_rows(
         pipeline_rows, logger=logger, cache=cache, require_eligible=False
     )
+    if xlsx.is_file():
+        loaded, _ = scraper.load_existing_output(xlsx, logger)
+        if loaded:
+            loaded_export = scraper.build_export_rows(
+                loaded, logger=logger, cache=cache, require_eligible=False
+            )
+            by_url = {}
+            for rec in loaded_export:
+                url = str(
+                    rec.get("URL")
+                    or rec.get("Company website")
+                    or rec.get("Strona www")
+                    or ""
+                ).strip()
+                if url:
+                    by_url[url] = rec
+            merged = list(loaded_export)
+            for rec in export_rows:
+                url = str(
+                    rec.get("URL")
+                    or rec.get("Company website")
+                    or rec.get("Strona www")
+                    or ""
+                ).strip()
+                if url and url not in by_url:
+                    merged.append(rec)
+            export_rows = merged
+            pipeline_rows = loaded
     export_rows, n_fill = fill_export_from_json(contacts, export_rows)
-    logger.info("Uzupelnienie z JSON: %s zmian", n_fill)
-    export_rows, gaps, rounds = verify_and_fill_until_complete(contacts, export_rows)
-    logger.info("Weryfikacja pamieci: rund=%s luk=%s wierszy=%s", rounds, len(gaps), len(export_rows))
+    logger.info("%s: uzupelnienie z JSON: %s zmian", pass_label, n_fill)
+    export_rows, gaps, rounds = verify_and_fill_until_complete(
+        contacts, export_rows, max_rounds=2
+    )
+    logger.info(
+        "%s: weryfikacja pamieci rund=%s luk=%s wierszy=%s",
+        pass_label,
+        rounds,
+        len(gaps),
+        len(export_rows),
+    )
     write_sheets(scraper, spec, xlsx, export_rows, pipeline_rows, cache, logger)
 
-    extra = 0
-    gaps_after: list[dict] = []
-    loaded_export = export_rows
-    loaded_pipeline = pipeline_rows
-    for disk_round in range(5):
+    loaded, _ = scraper.load_existing_output(xlsx, logger)
+    loaded_export = scraper.build_export_rows(
+        loaded, logger=logger, cache=cache, require_eligible=False
+    )
+    loaded_export, gaps_after, fill_rounds = verify_and_fill_until_complete(
+        contacts, loaded_export, max_rounds=2
+    )
+    if fill_rounds or gaps_after:
+        logger.warning(
+            "%s: po odczycie dysku JSON uzupelnia ponownie: rund=%s luki=%s — zapis",
+            pass_label,
+            fill_rounds,
+            len(gaps_after),
+        )
+        write_sheets(scraper, spec, xlsx, loaded_export, loaded, cache, logger)
         loaded, _ = scraper.load_existing_output(xlsx, logger)
-        loaded_pipeline = loaded
         loaded_export = scraper.build_export_rows(
             loaded, logger=logger, cache=cache, require_eligible=False
         )
-        loaded_export, gaps_after, fill_rounds = verify_and_fill_until_complete(
-            contacts, loaded_export
-        )
-        extra += fill_rounds
-        if fill_rounds or gaps_after:
-            logger.warning(
-                "Po odczycie dysku (runda %s) JSON uzupelnia i zapisuje: rund=%s luki=%s",
-                disk_round + 1,
-                fill_rounds,
-                len(gaps_after),
-            )
-            write_sheets(scraper, spec, xlsx, loaded_export, loaded_pipeline, cache, logger)
-            if fill_rounds:
-                continue
-        break
+        gaps_after = find_excel_gaps(contacts, loaded_export)
     logger.info(
-        "Weryfikacja koncowa: wierszy=%s luki=%s rund_dysku=%s",
+        "%s: zapisano %s wierszy, luki=%s",
+        pass_label,
         len(loaded_export),
         len(gaps_after),
-        extra,
     )
     return len(loaded_export), gaps_after
+
+
+def verify_and_save(
+    scraper,
+    spec: dict,
+    contacts: dict,
+    xlsx: Path,
+    cache: dict,
+    logger,
+) -> tuple[int, list[dict]]:
+    """Kompatybilnosc: jedna runda na juz wczytanym JSON."""
+    return fill_excel_from_contacts(
+        scraper, spec, contacts, xlsx, cache, logger, pass_label="pass"
+    )
+
+
+def verify_excel_with_double_json(
+    scraper,
+    spec: dict,
+    wyniki: Path,
+    xlsx: Path,
+    logger,
+    *,
+    passes: int = JSON_RELOAD_PASSES,
+) -> tuple[int, list[dict], int]:
+    """
+    Podwojne sprawdzenie: dwa razy wczytaj JSON z dysku, uzupelnij braki w Excelu, zapisz.
+    Na koncu jeszcze raz porownaj Excel vs JSON.
+    """
+    n_rows = 0
+    gaps: list[dict] = []
+    n_passes = max(2, int(passes))
+    last_contacts: dict = {}
+    for i in range(1, n_passes + 1):
+        label = f"JSON pass {i}/{n_passes}"
+        logger.info("%s: wczytuje cache JSON z dysku", label)
+        contacts = collect_needed_contacts(wyniki, xlsx, scraper, logger)
+        if contacts:
+            last_contacts = contacts
+        elif last_contacts:
+            logger.warning("%s: pusty JSON, uzywam poprzedniego odczytu", label)
+            contacts = last_contacts
+        elif i == 1:
+            raise SystemExit("Brak contacts JSON z danymi do Excela")
+        cache = {"contacts": contacts}
+        n_rows, gaps = fill_excel_from_contacts(
+            scraper, spec, contacts, xlsx, cache, logger, pass_label=label
+        )
+    logger.info("Sprawdzenie koncowe: ponowny odczyt JSON i Excela")
+    contacts = collect_needed_contacts(wyniki, xlsx, scraper, logger) or last_contacts
+    if xlsx.is_file():
+        loaded, _ = scraper.load_existing_output(xlsx, logger)
+        loaded_export = scraper.build_export_rows(
+            loaded, logger=logger, cache={"contacts": contacts}, require_eligible=False
+        )
+        gaps = find_excel_gaps(contacts, loaded_export)
+        if gaps:
+            logger.warning(
+                "Sprawdzenie koncowe: %s luk — ostatnie uzupelnienie z JSON i zapis",
+                len(gaps),
+            )
+            loaded_export, n_fill = fill_export_from_json(contacts, loaded_export)
+            loaded_export, gaps, _ = verify_and_fill_until_complete(
+                contacts, loaded_export, max_rounds=2
+            )
+            write_sheets(
+                scraper,
+                spec,
+                xlsx,
+                loaded_export,
+                loaded,
+                {"contacts": contacts},
+                logger,
+            )
+            n_rows = len(loaded_export)
+            logger.info("Zapis po sprawdzeniu koncowym: zmian=%s luk=%s", n_fill, len(gaps))
+    return n_rows, gaps, n_passes
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--campaign", choices=sorted(CAMPAIGNS), default="cn")
     parser.add_argument("--wyniki", type=Path, default=ROOT / "Wyniki")
+    parser.add_argument(
+        "--passes",
+        type=int,
+        default=JSON_RELOAD_PASSES,
+        help="Ile razy wczytac JSON z dysku, uzupelnic Excel i zapisac (min. 2)",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logger = logging.getLogger("verify_excel_json")
 
     scraper, spec = _load_scraper(args.campaign)
     xlsx = args.wyniki / spec["xlsx_name"]
-    contacts = collect_needed_contacts(args.wyniki, xlsx, scraper, logger)
-    if not contacts:
-        raise SystemExit("Brak contacts JSON z danymi do Excela")
-    cache = {"contacts": contacts}
-    n_rows, gaps = verify_and_save(scraper, spec, contacts, xlsx, cache, logger)
+    n_rows, gaps, n_passes = verify_excel_with_double_json(
+        scraper, spec, args.wyniki, xlsx, logger, passes=args.passes
+    )
     if gaps:
-        print(f"VERIFY_FAIL rows={n_rows} gaps={len(gaps)}")
+        print(f"VERIFY_FAIL rows={n_rows} gaps={len(gaps)} json_passes={n_passes}")
         for g in gaps[:20]:
             print(f"  {g['url']}: {g['reason']} {g['columns']}")
         return 1
-    print(f"VERIFY_OK rows={n_rows} contacts_json={len(contacts)} file={xlsx}")
+    print(f"VERIFY_OK rows={n_rows} json_passes={n_passes} file={xlsx}")
     return 0
 
 

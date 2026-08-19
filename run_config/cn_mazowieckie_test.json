@@ -1,8 +1,8 @@
 {
   "config_type": "cn_materialy",
   "campaign_id": "cn_materialy",
-  "lang": "zh",
-  "active_bundeslaender": ["guangdong"],
+  "lang": "pl",
+  "active_bundeslaender": ["mazowieckie"],
   "min_contacts_target": 5,
   "geo_filter_enabled": false,
   "require_generalunternehmer": true,

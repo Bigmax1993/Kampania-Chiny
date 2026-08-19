@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Kampania CN: hurtownie / składy / producenci / dystrybutorzy materiałów budowlanych.
-Nie: portale informacyjne, urzędy, czyste firmy wykonawcze bez sprzedaży materiałów.
+Kampania CN: dystrybutorzy / importerzy / wyłączni agenci materiałów budowlanych NA TERENIE POLSKI.
+Produkt dla chińskich eksporterów: zweryfikowani polscy partnerzy dystrybucyjni.
+Nie: portale, urzędy, czyste firmy wykonawcze, ogłoszenia OLX/Allegro.
 """
 from __future__ import annotations
 
@@ -13,61 +14,100 @@ from commercial_contact_filter import (
 REQUIRE_GENERALUNTERNEHMER = True  # alias: wymagaj roli dostawcy materiałów
 
 REQUIRED_RETAIL_CHAIN_KEYWORDS = (
-    "瓷砖",
-    "陶瓷",
-    "卫浴",
-    "灯具",
-    "铝型材",
-    "五金",
-    "地板",
-    "涂料",
-    "钢材",
-    "水泥",
-    "管材",
-    "石材",
-    "防水",
+    "płytki",
+    "ceramika",
+    "armatura",
+    "led",
+    "spc",
+    "aluminium",
+    "aluminiow",
+    "chemia",
+    "pvc",
+    "stal",
+    "sanitariat",
+    "oświetlenie",
+    "drzwi",
+    "kabin",
+    "prysznic",
+    "łazienk",
+    "lazienk",
+    "sanitarn",
+    "hydrau",
+    "brodzik",
+    "umywalk",
+    "baterie łazienkowe",
+    "instalacje sanitarne",
+    "armatura łazienkowa",
+    "ceramika łazienkowa",
+    "ościeżnic",
+    "oscieznic",
+    "natrysk",
+    "blach",
+    "nierdzewn",
+    "ocynk",
+    "zbrojeniow",
+    "kształtownik",
+    "ksztaltownik",
+    "pręty",
+    "prety stal",
+    "pręt stal",
+    "rury stal",
+    "rura stal",
+    "profile stal",
+    "wanna",
+    "wanny",
+    "stelaż",
+    "stelaz",
+    "podtynk",
+    "syfon",
+    "odpływ",
+    "odplyw",
 )
 
 STRICT_GU_MARKERS = (
-    "经销商",
-    "代理商",
-    "进口商",
-    "批发",
-    "官方代理",
-    "建材",
-    "工程经销",
-    "一级代理",
-    "外贸",
+    "dystrybutor",
+    "importer",
+    "wyłączny dystrybutor",
+    "oficjalny dystrybutor",
+    "autoryzowany dystrybutor",
+    "wyłączny importer",
+    "oficjalny importer",
+    "przedstawiciel",
+    "hurt",
+    "dystrybucja",
+    "import",
 )
 
 NON_GU_ROLE_EXCLUSION_MARKERS = (
-    "室内设计",
-    "装修公司",
-    "建筑设计",
-    "招聘",
-    "新闻",
-    "银行",
-    "保险",
-    "酒店",
-    "旅游",
-    "政府",
+    "biuro architektoniczne",
+    "projektowanie",
     "wykończenia wnętrz",
+    "bank",
+    "ubezpieczenia",
+    "portal informacyjny",
+    "encyklopedia",
+    "urząd",
+    "ministerstwo",
+    "oferty pracy",
+    "restauracja",
+    "hotel",
+    "salon samochodowy",
 )
 
 INTERIOR_FITOUT_MARKERS = (
-    "室内装修",
-    "装修公司",
-    "室内设计",
     "wykończenia wnętrz",
+    "remont mieszkań pod klucz",
+    "remont pod klucz",
 )
 
 STORE_SHELL_BUILD_MARKERS = MATERIAL_CATALOG_MARKERS = (
-    "产品中心",
-    "产品展示",
-    "产品目录",
-    "批发价",
-    "价格表",
-    "现货",
+    "katalog",
+    "cennik",
+    "asortyment",
+    "produkty",
+    "oferta hurtowa",
+    "dystrybucja",
+    "import",
 )
 
 RETAIL_STORE_BUILD_MARKERS = STRICT_GU_MARKERS
@@ -76,10 +116,9 @@ FILIALBAU_SPECIALIST_MARKERS = STRICT_GU_MARKERS
 GU_BUILDER_MARKERS = STRICT_GU_MARKERS
 
 RETAIL_OPERATOR_DOMAIN_MARKERS = (
-    "taobao.com",
-    "tmall.com",
-    "jd.com",
-    "pinduoduo.com",
+    "olx.pl",
+    "allegro.pl",
+    "otomoto.pl",
 )
 RETAIL_OPERATOR_PAGE_MARKERS = (
     "ogłoszenie",
@@ -87,11 +126,8 @@ RETAIL_OPERATOR_PAGE_MARKERS = (
     "używany",
     "bazar",
 )
-RETAIL_STORE_CONTEXT_MARKERS = STRICT_GU_MARKERS + MATERIAL_CATALOG_MARKERS
-
 MEDIA_PUBLISHER_DOMAIN_MARKERS = (
     "news.",
-    "novosti",
     "gazeta",
     "portal",
     "wikipedia",
@@ -105,22 +141,22 @@ MEDIA_PUBLISHER_NAME_MARKERS = (
 )
 MEDIA_PUBLISHER_URL_PATH_MARKERS = (
     "/news/",
-    "/novosti/",
     "/article/",
     "/blog/",
 )
+RETAIL_STORE_CONTEXT_MARKERS = STRICT_GU_MARKERS + MATERIAL_CATALOG_MARKERS
 
 PORTFOLIO_SECTION_MARKERS = MATERIAL_CATALOG_MARKERS
 RETAIL_CHAIN_IN_PORTFOLIO_MARKERS = REQUIRED_RETAIL_CHAIN_KEYWORDS
 MARKET_PROJECT_IN_PORTFOLIO_MARKERS = REQUIRED_RETAIL_CHAIN_KEYWORDS
-MARKET_PHOTO_GALLERY_MARKERS = ("каталог", "галерея", "асортимент", "продукція")
+MARKET_PHOTO_GALLERY_MARKERS = ("katalog", "galeria", "asortyment", "produkty")
 RETAIL_PROJECT_DESCRIPTION_MARKERS = MATERIAL_CATALOG_MARKERS
 RETAIL_PROJECT_BUILD_ACTIVITY_MARKERS = STRICT_GU_MARKERS
 RETAIL_IMAGE_FILE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif")
 PURE_RENOVATION_WITHOUT_STORE_BUILD = (
     "wykończenia wnętrz",
-    "ремонт квартир",
-    "оздоблювальні роботи",
+    "remont mieszkań",
+    "remont pod klucz",
 )
 
 

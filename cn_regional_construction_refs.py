@@ -28,6 +28,36 @@ class ConstructionProjectRef:
         )
 
 
+# Plac budowy jako przykład zapotrzebowania w Polsce — odbiorca to polski dystrybutor/importer.
+POLAND_BUYER_CONSTRUCTION_REFS: tuple[ConstructionProjectRef, ...] = (
+    ConstructionProjectRef(
+        "Osiedle Wilno",
+        "osiedle mieszkaniowe wielorodzinne",
+        "Warszawa, ul. Odkryta 10",
+    ),
+    ConstructionProjectRef(
+        "Bliska Wola Tower",
+        "kompleks mieszkaniowo-biurowy",
+        "Warszawa, ul. Kasprzaka 29",
+    ),
+    ConstructionProjectRef(
+        "Osiedle AVIA",
+        "osiedle mieszkaniowe",
+        "Kraków, ul. Stella-Sawickiego 25",
+    ),
+    ConstructionProjectRef(
+        "Bonarka Living",
+        "kompleks mieszkaniowy",
+        "Kraków, ul. Puszkarska 7H",
+    ),
+    ConstructionProjectRef(
+        "Osiedle Francuska Park",
+        "osiedle mieszkaniowe",
+        "Katowice, ul. Francuska 70",
+    ),
+)
+
+
 # Adresy z publicznych kart projektow (strony deweloperow / portale nieruchomosci CN).
 WOJEWODZTWO_CONSTRUCTION_REFS: dict[str, tuple[ConstructionProjectRef, ...]] = {
     "guangdong": (
@@ -176,29 +206,27 @@ def pick_construction_project(
     *,
     prefer_city: str = "",
 ) -> ConstructionProjectRef:
-    key = _normalize_wojewodztwo_key(wojewodztwo_key)
-    pool = WOJEWODZTWO_CONSTRUCTION_REFS.get(key)
-    if not pool:
-        return _DEFAULT_FALLBACK
+    """Obiekt w Polsce (zapotrzebowanie). Województwo odbiorcy jest seedem, nie lokalizacją budowy."""
+    pool = POLAND_BUYER_CONSTRUCTION_REFS
     city = (prefer_city or "").strip()
     if city:
         city_pool = tuple(project for project in pool if _project_matches_city(project, city))
         if city_pool:
             pool = city_pool
-    digest = hashlib.sha256((seed or key).encode("utf-8")).hexdigest()
+    digest = hashlib.sha256((seed or wojewodztwo_key or "pl").encode("utf-8")).hexdigest()
     idx = int(digest[:8], 16) % len(pool)
     return pool[idx]
 
 
 def build_construction_project_prompt_block_pl(project: ConstructionProjectRef) -> str:
-    return f"""OBIEKT BUDOWY (OBOWIĄZKOWO — sprawdzona baza publicznych inwestycji w Chinach)
+    return f"""OBIEKT BUDOWY (Polska — przykład zapotrzebowania; nie mylić z siedzibą chińskiej fabryki)
 {project.prompt_block_pl()}
 
 WYMAGANIA DOTYCZĄCE OBIEKTU I ADRESU
-• To jest REALNA inwestycja z publicznej bazy (strony deweloperów / portale inwestycji) — NIE wymyślaj innego obiektu.
-• W treści listu MUSI pojawić się PEŁNA nazwa obiektu «{project.name_pl}» ORAZ PEŁNY adres z wiersza «Adres» powyżej — dosłownie, bez zmiany numeru budynku, nazwy ulicy ani miasta.
-• Zabronione: fikcyjne osiedla, „placeholderowe” adresy, inna ulica/numer/miasto, ogólne „budowa w okolicy” bez adresu z bazy.
-• Wspomnij typ obiektu ({project.object_type_pl}) i krótko — jakie materiały budowlane są potrzebne na ten plac budowy."""
+• To jest REALNA inwestycja w Polsce (publiczna baza) — NIE wymyślaj innego obiektu.
+• W treści listu MUSI pojawić się PEŁNA nazwa obiektu «{project.name_pl}» ORAZ PEŁNY adres z wiersza «Adres» powyżej — dosłownie.
+• Zabronione: fikcyjne osiedla, inna ulica/numer/miasto.
+• Wspomnij typ obiektu ({project.object_type_pl}) jako przykład zapotrzebowania na materiały z Chin (import / dystrybucja w Polsce)."""
 
 
 def inject_construction_project_context(body: str, project: ConstructionProjectRef) -> str:
@@ -207,11 +235,11 @@ def inject_construction_project_context(body: str, project: ConstructionProjectR
     if not text or address_present_in_body(text, project.address_pl):
         return text
     paragraph = (
-        f"我们正在建设{project.object_type_pl}「{project.name_pl}」"
-        f"（{project.status_pl}），地址：{project.address_pl}。"
-        f"该项目需要持续采购建材。"
+        f"Realizujemy zapotrzebowanie na materiały przy inwestycji {project.object_type_pl} "
+        f"«{project.name_pl}» ({project.status_pl}), adres: {project.address_pl}. "
+        f"Szukamy dystrybutora w Polsce do stałych dostaw."
     )
-    marker = "此致敬礼"
+    marker = "Z poważaniem"
     if marker in text:
         head, tail = text.split(marker, 1)
         return f"{head.rstrip()}\n\n{paragraph}\n\n{marker}{tail}"

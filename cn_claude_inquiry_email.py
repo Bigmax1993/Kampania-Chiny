@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Callable
 
 from claude_client import claude_generate_text
@@ -17,6 +18,37 @@ from cn_regional_construction_refs import (
     pick_construction_project,
 )
 from cn_regional_sender_context import resolve_discovery_wojewodztwo, wojewodztwo_primary_city_pl
+
+
+def body_mentions_recipient_company(body: str, company_name: str) -> bool:
+    """True, gdy treść odnosi się do tej firmy (pełna nazwa albo charakterystyczny człon)."""
+    name = (company_name or "").strip()
+    if not name:
+        return False
+    blob = (body or "").casefold()
+    if name.casefold() in blob:
+        return True
+    stop = {
+        "sp",
+        "zoo",
+        "saa",
+        "polska",
+        "firma",
+        "spolka",
+        "spółka",
+        "ograniczona",
+        "odpowiedzialnoscia",
+        "odpowiedzialnością",
+        "gmbh",
+        "ltd",
+        "inc",
+    }
+    tokens = re.findall(r"[0-9A-Za-zÀ-ÿĄąĆćĘęŁłŃńÓóŚśŹźŻż]{4,}", name)
+    significant = [t for t in tokens if t.casefold() not in stop]
+    if not significant:
+        return False
+    best = max(significant, key=len)
+    return best.casefold() in blob
 
 
 def _contact_blob(contact_info: dict | None) -> dict[str, str]:
@@ -53,8 +85,8 @@ def _resolve_cache_key(
     return key or (company_name or "firma").strip()
 
 
-def _cached_inquiry_is_usable(cached: object) -> bool:
-    """Tylko wpisy z realnym adresem budowy — stare szablony (Swinczak/analizy) odrzucamy."""
+def _cached_inquiry_is_usable(cached: object, company_name: str = "") -> bool:
+    """Tylko wpisy z realnym adresem budowy i nazwą tej firmy."""
     if not isinstance(cached, dict):
         return False
     subj = str(cached.get("subject") or "").strip()
@@ -62,7 +94,11 @@ def _cached_inquiry_is_usable(cached: object) -> bool:
     addr = str(cached.get("construction_address") or "").strip()
     if not subj or not body or not addr:
         return False
-    return address_present_in_body(body, addr)
+    if not address_present_in_body(body, addr):
+        return False
+    if company_name and not body_mentions_recipient_company(body, company_name):
+        return False
+    return True
 
 
 def invalidate_claude_inquiry_email_cache(
@@ -118,19 +154,18 @@ def claude_generate_inquiry_email_zh(
     if cache is None:
         cache = {}
 
+    ctx = _contact_blob(contact_info)
+    display_name = ctx["company_name"] or (company_name or "").strip() or "Dostawca"
     key = _resolve_cache_key(
         cache_key=cache_key, contact_info=contact_info, company_name=company_name
     )
 
     mail_cache = cache.setdefault("claude_inquiry_email", {})
     cached = mail_cache.get(key)
-    if _cached_inquiry_is_usable(cached):
+    if _cached_inquiry_is_usable(cached, display_name):
         subj = str(cached.get("subject") or "").strip()
         body = str(cached.get("body") or "").strip()
         return subj, body
-
-    ctx = _contact_blob(contact_info)
-    display_name = ctx["company_name"] or (company_name or "").strip() or "Dostawca"
     region_key = resolve_discovery_wojewodztwo(ctx, fallback=ctx.get("wojewodztwo") or "")
     supplier_city = extract_city_from_address_pl(ctx.get("address") or "")
     if not supplier_city:
@@ -175,6 +210,10 @@ def claude_generate_inquiry_email_zh(
         body = strip_foreign_phones_from_text(body)
         body = strip_legacy_branding_preserve_layout(body)
         body = format_inquiry_email_body_pl(body)
+        if not body_mentions_recipient_company(body, display_name):
+            raise ValueError(
+                f"Claude inquiry email bez nazwy odbiorcy: {display_name}"
+            )
         if not address_present_in_body(body, project.address_pl):
             raise ValueError(
                 f"Claude inquiry email bez zweryfikowanego adresu budowy: {project.address_pl}"

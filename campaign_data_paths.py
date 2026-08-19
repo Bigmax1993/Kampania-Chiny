@@ -18,7 +18,7 @@ GOOGLE_DRIVE_GU_FOLDER_ID = "1tP8oUi72t4EHDbE9GnHFdvfNtNsJe4xf"
 GOOGLE_DRIVE_GU_FOLDER_URL = (
     f"https://drive.google.com/drive/folders/{GOOGLE_DRIVE_GU_FOLDER_ID}?usp=drive_link"
 )
-GOOGLE_DRIVE_CN_FOLDER_ID = ""
+GOOGLE_DRIVE_CN_FOLDER_ID = "1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC"
 GOOGLE_DRIVE_CN_FOLDER_URL = (
     f"https://drive.google.com/drive/folders/{GOOGLE_DRIVE_CN_FOLDER_ID}?usp=drive_link"
 )

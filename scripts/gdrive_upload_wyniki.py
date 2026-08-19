@@ -71,6 +71,20 @@ def _gdrive_append_xlsx_enabled() -> bool:
     return raw not in ("0", "false", "no", "off")
 
 
+_KONTAKTE_XLSX_BY_CAMPAIGN = {
+    "cn": "cn_materialy_kontakte.xlsx",
+    "pl": "cn_materialy_kontakte.xlsx",
+}
+
+
+def _is_appendable_kontakte_xlsx(campaign: str, local_xlsx: Path) -> bool:
+    if local_xlsx.suffix.lower() != ".xlsx":
+        return False
+    if "_kontakte" not in local_xlsx.stem.lower():
+        return False
+    return campaign in ("cn", "pl")
+
+
 def _upload_stamp() -> str:
     try:
         from zoneinfo import ZoneInfo
@@ -397,7 +411,7 @@ def append_kontakte_xlsx_from_drive(
     """
     if not _gdrive_append_xlsx_enabled():
         return 0
-    if campaign != "pl" or local_xlsx.suffix.lower() != ".xlsx":
+    if not _is_appendable_kontakte_xlsx(campaign, local_xlsx):
         return 0
     if not local_xlsx.is_file():
         return 0
@@ -424,6 +438,28 @@ def append_kontakte_xlsx_from_drive(
             f"→ {len(merged)} (+{added} nowych wierszy)"
         )
         return added
+
+
+def download_wyniki_xlsx_from_drive(
+    service,
+    wyniki: Path,
+    drive_parent_id: str,
+    *,
+    campaign: str,
+    logger: logging.Logger,
+) -> bool:
+    """Pobiera istniejący cn_materialy_kontakte.xlsx z Drive (ten sam plik, bez kopii)."""
+    name = _KONTAKTE_XLSX_BY_CAMPAIGN.get(campaign, "cn_materialy_kontakte.xlsx")
+    wyniki.mkdir(parents=True, exist_ok=True)
+    dest = wyniki / name
+    remote = _find_drive_file_by_name(service, drive_parent_id, name)
+    if not remote:
+        print(f"Drive download: brak {name} — pierwszy run, bez pobrania")
+        return False
+    _download_drive_file(service, remote["id"], dest)
+    print(f"Drive download: {name} -> {dest} (istniejacy plik, bez nowej kopii)")
+    logger.info("Pobrano Excel z Drive: %s", dest)
+    return True
 
 
 def merge_wyniki_xlsx_from_drive(
@@ -513,6 +549,11 @@ def main() -> int:
         "--folder-id",
         default=None,
     )
+    parser.add_argument(
+        "--download-xlsx",
+        action="store_true",
+        help="Pobierz istniejący *_kontakte.xlsx z Drive (bez uploadu, bez nowej kopii)",
+    )
     args = parser.parse_args()
     folder_id = (args.folder_id or _default_folder_id(args.campaign)).strip()
 
@@ -522,8 +563,18 @@ def main() -> int:
     upload_folder_id = _resolve_upload_folder(service, folder_id, use_oauth=use_oauth)
     logger = logging.getLogger("gdrive_upload")
 
-    total = 0
     w = wyniki_dir(data_root)
+    if args.download_xlsx:
+        download_wyniki_xlsx_from_drive(
+            service,
+            w,
+            upload_folder_id,
+            campaign=args.campaign,
+            logger=logger,
+        )
+        return 0
+
+    total = 0
     if w.is_dir():
         merge_wyniki_xlsx_from_drive(
             service,

@@ -5,26 +5,26 @@ Repozytorium: [wyszukiwarka-materialow-budowlanych-chiny](https://github.com/Big
 Kampania siostrzana (Polska): [wyszukiwarka-materialow-budowlanych-polska](https://github.com/Bigmax1993/wyszukiwarka-materialow-budowlanych-polska)  
 Kampania siostrzana (Ukraina): [wyszukiwarka-materialow-budowlanych-ukraina](https://github.com/Bigmax1993/wyszukiwarka-materialow-budowlanych-ukraina)
 
-**Produkcja:** `cn_materialy` — hurtownie i składy budowlane w Chinach (GitHub Actions + opcjonalnie Task Scheduler PC).
+**Produkcja:** `cn_materialy` — polscy dystrybutorzy i importerzy materiałów budowlanych (produkt dla chińskich eksporterów; GitHub Actions + opcjonalnie Task Scheduler PC).
 
 ---
 
 ## Pipeline
 
-**Serper (gl=cn, hl=zh-cn) → crawl www → Claude verify (CN) → Excel → maile ZH**
+**Serper (gl=pl, hl=pl) → crawl www → Claude verify (PL dystrybutor) → Excel → maile PL**
 
-Szczegóły: [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md)
+Szczegóły: [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md) · maile: [`docs/MAILE.md`](docs/MAILE.md) · Drive: [`docs/GOOGLE_DRIVE.md`](docs/GOOGLE_DRIVE.md)
 
 | Moduł | Plik |
 |-------|------|
 | Scraper | `cn_materialy_scraper.py` |
-| Frazy per prowincjio | `cn_province_keywords.py` |
-| Rotacja prowincji | `cn_province_rotation.py` |
-| Filtr dostawców | `cn_materialy_supplier_filter.py` |
-| Prompty Claude CN | `cn_claude_prompts.py` |
-| Treść maila ZH | `cn_materialy_inquiry_email_zh.py` |
+| Frazy per województwo | `cn_province_keywords.py` |
+| Rotacja województw | `cn_province_rotation.py` |
+| Filtr dystrybutorów | `cn_materialy_supplier_filter.py` |
+| Prompty Claude | `cn_claude_prompts.py` |
+| Treść maila PL | `cn_materialy_inquiry_email_zh.py` |
 
-Maile po chińsku, tel. **516513965**, **bez załączników**.
+Maile po polsku do dystrybutorów w Polsce, **bez telefonu i bez strony www**, **bez załączników**.
 
 Wyniki: `Wyniki/cn_materialy_cache.json`, `cn_materialy_kontakte.xlsx`.
 
@@ -69,9 +69,13 @@ Szczegóły: [`schedule/cn/PLAN_5_DNI_CN.md`](schedule/cn/PLAN_5_DNI_CN.md), [`d
 
 | Dzień | Godzina (Asia/Shanghai) | GitHub Actions |
 |-------|------------------------|----------------|
-| Pon–Pt | 22:00 / 20:00 / 00:00 / 01:00 / 21:00 | `CN discovery` |
-| Niedziela | 10:30 | `CN niedziela backfill` |
-| Poniedziałek | 11:00 / 12:00 / 14:00 | sync Drive → prep → send |
+| Poniedziałek | 20:00 | `CN discovery` |
+| Wtorek | 20:00 | `CN discovery` |
+| Środa | 21:00 | `CN discovery` |
+| Czwartek | 21:00 | `CN discovery` |
+| Piątek | 19:00 | `CN discovery` |
+| Niedziela | 09:30 | `CN niedziela backfill` |
+| Poniedziałek | 10:00 / 11:00 / 14:00 | sync Drive → prep → send |
 | Wtorek | 14:00 | `CN wtorek send` |
 
 Offset +5h względem UA — pipeline PL w **osobnym repo**, bez kolizji cron.
@@ -96,7 +100,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_full_pipeline_gha.ps1
 |-------|---------|
 | Serper | 1000 zapytań / dzień |
 | E-mail | 300 / dzień, 2 / domena / dzień (pon + wt) |
-| Rotacja | 1 prowincjio / tydzień |
+| Rotacja | 1 województwo / tydzień |
 
 ---
 
@@ -114,12 +118,26 @@ Concurrency: `cn-pipeline` (w tym repo).
 | `ANTHROPIC_API_KEY` | tak | Claude API |
 | `MAIL_USER`, `MAIL_PASSWORD` | tak (send) | SMTP / Gmail |
 | `MAIL_SENDER_NAME` | tak | Maksym Swinczak |
-| `GDRIVE_FOLDER_ID_CN` | tak | ID folderu Drive (utwórz folder CN i wklej secret) |
+| `GDRIVE_FOLDER_ID_CN` | tak | `1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC` |
 | `GDRIVE_OAUTH_*` | zalecany | Upload OAuth |
 
 **Nie ustawiaj** `GDRIVE_FOLDER_ID_UA` w tym repo.
 
 Google Drive: [`docs/GOOGLE_DRIVE.md`](docs/GOOGLE_DRIVE.md)
+
+Końcowy Excel: [folder Drive CN](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC?usp=drive_link) — `cn_materialy_kontakte.xlsx`
+
+---
+
+## Dokumentacja
+
+| Dokument | Treść |
+|----------|--------|
+| [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md) | Cel, wyszukiwanie, pipeline, pliki |
+| [`docs/MAILE.md`](docs/MAILE.md) | Zasady maili + przykłady per firma |
+| [`docs/GOOGLE_DRIVE.md`](docs/GOOGLE_DRIVE.md) | Folder Drive i upload Excela |
+| [`docs/GITHUB_ACTIONS.md`](docs/GITHUB_ACTIONS.md) | Workflowy, cron, sekrety |
+| [`schedule/cn/PLAN_5_DNI_CN.md`](schedule/cn/PLAN_5_DNI_CN.md) | Tydzień discovery / send |
 
 ---
 

@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Kontekst nadawcy maili PL — firma budowlana średniego rozmiaru per prowincjio discovery."""
+"""Kontekst nadawcy maili CN — chiński producent/eksporter do polskiego dystrybutora/importera."""
 from __future__ import annotations
 
 from cn_province_keywords import PROVINCE_CONFIG, _normalize_wojewodztwo_key
 
-# Województwa z dużymi ośrodkami — ten sam szablon maila co w mniejszych miastach regionu.
 MAJOR_CITY_WOJEWODZTWO_KEYS: frozenset[str] = frozenset(PROVINCE_CONFIG.keys())
 
 
 def resolve_discovery_wojewodztwo(contact_info: dict | None, *, fallback: str = "") -> str:
-    """Prowincja z discovery (discovery_bundesland) lub z wiersza kontaktu."""
+    """Województwo odbiorcy z discovery (discovery_bundesland) lub z wiersza kontaktu."""
     info = contact_info or {}
     for key in ("discovery_bundesland", "bundesland", "wojewodztwo"):
         raw = str(info.get(key) or "").strip()
@@ -37,16 +36,14 @@ def wojewodztwo_cities_pl(wojewodztwo_key: str, *, limit: int = 5) -> tuple[str,
 
 
 def wojewodztwo_region_label_pl(wojewodztwo_key: str) -> str:
-    """Etykieta regionu po chińsku do promptu Claude."""
     key = _normalize_wojewodztwo_key(wojewodztwo_key)
     city = wojewodztwo_primary_city_pl(key)
     if key in PROVINCE_CONFIG:
         return f"{city} (woj. {key})"
-    return wojewodztwo_key or "Chiny"
+    return wojewodztwo_key or "Polska"
 
 
 def major_city_examples_pl(wojewodztwo_key: str) -> str:
-    """Przykładowe duże miasta w prowincjiie — do promptu Claude."""
     key = _normalize_wojewodztwo_key(wojewodztwo_key)
     cities = wojewodztwo_cities_pl(key, limit=3)
     if not cities:
@@ -62,57 +59,45 @@ def build_regional_sender_instructions_pl(
     construction_project_block: str = "",
 ) -> str:
     """
-    Instrukcje dla Claude: wybór realnej średniej firmy budowlanej z regionu
-    i wzmianka o aktualnej dużej budowie w tym regionie (także w dużych miastach).
+    Nadawca = chiński producent/eksporter (Maksym).
+    Odbiorca = polski dystrybutor/importer w województwie discovery.
+    Plac budowy = w Polsce (blok OBIEKT BUDOWY) jako przykład zapotrzebowania.
     """
     key = _normalize_wojewodztwo_key(wojewodztwo_key)
     region = (
         wojewodztwo_region_label_pl(key)
         if key in PROVINCE_CONFIG
-        else (wojewodztwo_key or "Chiny")
+        else (wojewodztwo_key or "Polska")
     )
     cities = ", ".join(wojewodztwo_cities_pl(key, limit=6)) or region
     major_examples = major_city_examples_pl(key)
-    is_major_hub = key in MAJOR_CITY_WOJEWODZTWO_KEYS
     name = (sender_name or "Maksym Swinczak").strip()
-    phone = (sender_phone or "516513965").strip()
     project_section = (
         f"\n\n{construction_project_block.strip()}\n"
         if (construction_project_block or "").strip()
         else ""
     )
-    major_city_note = ""
-    if is_major_hub and major_examples:
-        major_city_note = (
-            f"\n• Ta reguła obowiązuje JEDNAKOWO dla dużych miast ({major_examples}) "
-            f"i mniejszych miejscowości prowincjia — zmieniają się tylko lokalna firma-nadawca "
-            f"oraz konkretny obiekt budowy z bazy (inny adres)."
+    hub_note = ""
+    if major_examples:
+        hub_note = (
+            f"\n• Odbiorca działa w regionie ({major_examples}) — wspomnij miasto/województwo, "
+            f"plac budowy bierz z bloku «OBIEKT BUDOWY» (Polska)."
         )
 
-    return f"""REGION DISCOVERY (obowiązkowy kontekst)
-Prowincja / region: {region}
-Klucz wojewodztwo: {key or "(nieznane)"}
-Główne miasta regionu: {cities}
+    return f"""REGION DISCOVERY (lokalizacja ODBIORCY w Polsce)
+Województwo / region odbiorcy: {region}
+Klucz województwa: {key or "(nieznane)"}
+Miasta regionu: {cities}
+{hub_note}
 
-JEDNAKOWY SZABLON LISTA — DLA WSZYSTKICH MIAST (dużych i regionalnych)
-• Struktura listu jednakowa: lokalna firma budowlana średniego rozmiaru + realny obiekt z bloku «OBIEKT BUDOWY» + prośba o cennik.
-• W dużych ośrodkach wojewódzkich (Warszawa, Kraków, Wrocław, Gdańsk, Poznań, Katowice itd.) NIE zmieniaj formatu — tylko inna lokalna firma i inny adres placu budowy.{major_city_note}
-
-NADAWCA — ŚREDNIA LOKALNA FIRMA BUDOWLANA (miasto / prowincjio discovery)
-• Wybierz REALNĄ, ISTNIEJĄCĄ polską firmę budowlaną / deweloperską / wykonawczą ŚREDNIEGO rozmiaru, działającą w tym regionie discovery (także w dużym mieście prowincjia).
-  Firma MUSI być prawdziwa (KRS / CEIDG / publiczna strona / znana lokalnie) — NIE wymyślaj nazw typu „Budownictwo X Sp. z o.o.”, „Firma Budowlana XYZ”, „Local Build” itd.
-  Średni rozmiar = lokalny / regionalny deweloper lub wykonawca (sp. z o.o., S.A. lokalna), NIE największy krajowy holding
-  (nie Dom Development, Robyg, Echo Investment, Budimex, Skanska, Murapol, Atal, Develia, Archicom itd.) i nie jednoosobowa „garażowa” firma.
-• Użyj pełnej, poprawnej nazwy prawnej firmy (np. z formy „Sp. z o.o.” / „S.A.”), jeśli jest powszechnie znana.
-• Firma ma być typowym lokalnym graczem dla tego miasta / regionu — nie „ogólnopolska korporacja”.
-• Przedstaw się jako {name} — menedżer działu sprzedaży wybranej REALNEJ firmy.
-• W liście jasno nazwij tę firmę i jej rolę (budowa obiektów mieszkaniowych, komercyjnych lub przemysłowych w tym mieście / regionie).
-• Obiekt budowy bierz WYŁĄCZNIE z bloku «OBIEKT BUDOWY» poniżej — to realna, publiczna inwestycja; nie wymyślaj innych budów ani adresów.
+NADAWCA — CHIŃSKI PRODUCENT / EKSPORTER (szuka dystrybutora w Polsce)
+• Przedstaw się jako {name} — reprezentujesz chińskiego producenta / eksportera materiałów budowlanych.
+• Szukasz polskiego dystrybutora / importera / wyłącznego dystrybutora na terenie Polski.
+• NIE wymyślaj polskiej firmy-nadawcy typu „Budownictwo XYZ Sp. z o.o.”.
+• NIE udawaj lokalnego wykonawcy z Warszawy / Krakowa.
+• Obiekt budowy bierz WYŁĄCZNIE z bloku «OBIEKT BUDOWY» — inwestycja w POLSCE (zapotrzebowanie).
 {project_section}
-PODPIS (dodaj na końcu body):
-此致敬礼
+PODPIS (dodaj na końcu body, po polsku — BEZ telefonu i BEZ strony www):
+Z poważaniem,
 {name}
-Menedżer działu sprzedaży
-[pełna PRAWDZIWA nazwa wybranej firmy — bez fikcyjnych nazw]
-[strona firmy, jeśli znana]
-Tel.: {phone}"""
+Współpraca dystrybucyjna / import z Chin"""

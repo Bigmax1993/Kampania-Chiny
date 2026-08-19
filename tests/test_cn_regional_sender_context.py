@@ -10,35 +10,36 @@ from cn_regional_sender_context import (
 
 def test_resolve_discovery_prefers_discovery_bundesland():
     key = resolve_discovery_wojewodztwo(
-        {"discovery_bundesland": "zhejiang", "bundesland": "jiangsu"}
+        {"discovery_bundesland": "slaskie", "bundesland": "malopolskie"}
     )
-    assert key == "zhejiang"
+    assert key == "slaskie"
 
 
-def test_primary_city_guangdong():
-    assert wojewodztwo_primary_city_pl("guangdong") == "佛山"
+def test_primary_city_mazowieckie():
+    assert wojewodztwo_primary_city_pl("mazowieckie") == "Warszawa"
 
 
 def test_regional_sender_mentions_construction_block():
     text = build_regional_sender_instructions_pl(
-        "sichuan",
+        "slaskie",
         sender_name="Maksym Swinczak",
         sender_phone="516513965",
-        construction_project_block="OBIEKT BUDOWY\n• Adres: 成都市天府新区兴隆湖",
+        construction_project_block="OBIEKT BUDOWY\n• Adres: Warszawa, ul. Odkryta 10",
     )
     assert "REGION DISCOVERY" in text
-    assert "成都" in text or "sichuan" in text
+    assert "Katowice" in text or "slaskie" in text
     assert "OBIEKT BUDOWY" in text
-    assert "516513965" in text
+    assert "516513965" not in text
+    assert "swinczakdata" not in text.lower()
     assert "Maksym Swinczak" in text
-    assert "średni" in text.lower()
+    assert "dystrybutor" in text.lower() or "importer" in text.lower() or "eksporter" in text.lower()
 
 
-def test_regional_sender_requires_real_company():
+def test_regional_sender_is_chinese_exporter_not_fake_pl_builder():
     text = build_regional_sender_instructions_pl(
-        "sichuan",
+        "slaskie",
         sender_name="Maksym Swinczak",
         sender_phone="516513965",
     )
-    assert "REALNĄ" in text or "istniejącą" in text.lower() or "ISTNIEJĄCĄ" in text
-    assert "NIE wymyślaj" in text or "fikcyjnych" in text.lower()
+    assert "NIE wymyślaj" in text or "fikcyj" in text.lower()
+    assert "Warszawa" in text or "Kraków" in text or "Polska" in text or "odbiorc" in text.lower()

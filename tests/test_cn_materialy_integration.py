@@ -49,11 +49,11 @@ def test_scraper_smoke_test_entrypoint():
     scraper._run_smoke_tests()
 
 
-def test_run_config_guangdong_test_loads():
+def test_run_config_mazowieckie_test_loads():
     from scraper_run_config import load_run_config_file
 
-    data = load_run_config_file("run_config/cn_guangdong_test.json", ROOT)
-    assert "guangdong" in data.get("active_bundeslaender", [])
+    data = load_run_config_file("run_config/cn_mazowieckie_test.json", ROOT)
+    assert "mazowieckie" in data.get("active_bundeslaender", [])
 
 
 def test_apply_rotation_configures_module(tmp_path):
@@ -66,39 +66,42 @@ def test_apply_rotation_configures_module(tmp_path):
 
 def test_configure_wojewodztwa_sets_discovery_waves():
     mod = type("M", (), {})()
-    configure_campaign_provinces(mod, ["guangdong"], max_discovery_terms=50)
+    configure_campaign_provinces(mod, ["mazowieckie"], max_discovery_terms=50)
     assert mod.SERPER_DISCOVERY_TERMS
     assert mod.SERPER_DISCOVERY_FALLBACK_TERMS
     assert mod.SERPER_DISCOVERY_BROAD_TERMS
     assert mod.SERPER_DISCOVERY_LANDKREIS_TERMS
     assert mod.SERPER_DISCOVERY_PLACES_TERMS
-    assert mod.SERPER_DISCOVERY_REGION_SUFFIX == "中国"
+    assert mod.SERPER_DISCOVERY_REGION_SUFFIX == "Polska"
 
 
-def test_page_verify_prompt_cn_context():
+def test_page_verify_prompt_pl_distributor_context():
     p = build_page_verify_prompt(
-        "佛山建材经销商",
-        "https://foshan-tile.cn",
-        "瓷砖 卫浴 批发 经销商 佛山",
+        "Warszawski Dystrybutor Płytek",
+        "https://plytki-dystrybucja.pl",
+        "płytki ceramika importer dystrybutor Warszawa",
     )
     assert "is_gu" in p
-    assert "经销商" in p or "中国" in p
+    assert "dystrybutor" in p
+    assert "importer" in p or "Polsce" in p or "POLSCE" in p
 
 
-def test_claude_inquiry_prompt_chinese_and_phone():
+def test_claude_inquiry_prompt_polish_and_phone():
     p = build_personalized_inquiry_email_prompt_zh(
-        company_name="佛山建材经销商",
-        wojewodztwo="guangdong",
-        discovery_wojewodztwo="guangdong",
+        company_name="Warszawski Dystrybutor Płytek",
+        wojewodztwo="mazowieckie",
+        discovery_wojewodztwo="mazowieckie",
     )
-    assert "chiń" in p.lower() or "中国" in p
-    assert "516513965" in p
+    assert "dystrybutor" in p.lower() or "polsk" in p.lower()
+    assert "516513965" not in p
+    assert "swinczakdata" not in p.lower()
     assert "JSON" in p
     assert "FORMAT LISTU" in p
     assert "OBIEKT BUDOWY" in p
     assert "REGION DISCOVERY" in p
     assert "\\n\\n" in p
-    assert "此致敬礼" in p
+    assert "Z poważaniem" in p
+    assert "nazwa odbiorcy" in p.lower() or "MUSI pojawić się nazwa" in p
     assert "analizy rynku" not in p.lower()
     assert "benchmark" not in p.lower()
 
@@ -139,7 +142,77 @@ def test_sync_drive_pl_uses_pl_campaign():
 
 def test_sunday_backfill_verifies_excel_from_json_and_uploads_drive():
     text = (ROOT / ".github" / "workflows" / "cn_materialy_thu.yml").read_text(encoding="utf-8")
-    assert "verify_excel_from_json.py" in text
+    assert text.count("verify_excel_from_json.py") >= 2
+    assert "--passes 2" in text
     assert "gdrive_upload_wyniki.py" in text
     assert "GDRIVE_FOLDER_ID_CN" in text
     assert "--campaign cn" in text
+    assert "--download-xlsx" in text
+    assert 'GDRIVE_APPEND_XLSX: "1"' in text
+    assert 'GDRIVE_APPEND_XLSX: "0"' not in text
+    assert 'GDRIVE_VERSION_XLSX: "0"' in text
+
+
+def test_monday_prep_verifies_excel_from_json_twice_and_uploads_drive():
+    text = (ROOT / ".github" / "workflows" / "cn_materialy_mon.yml").read_text(encoding="utf-8")
+    assert text.count("verify_excel_from_json.py") >= 2
+    assert "--passes 2" in text
+    assert "gdrive_upload_wyniki.py" in text
+    assert "GDRIVE_FOLDER_ID_CN" in text
+    assert "--campaign cn" in text
+    assert 'GDRIVE_APPEND_XLSX: "1"' in text
+    assert 'GDRIVE_APPEND_XLSX: "0"' not in text
+
+
+def test_merge_pipeline_rows_appends_and_keeps_existing_fields():
+    existing = [
+        {"url": "https://a.pl", "email_target": "old@a.pl", "nazwa": "A", "telefon": ""}
+    ]
+    incoming = [
+        {"url": "https://a.pl", "email_target": "", "telefon": "500100200"},
+        {"url": "https://b.pl", "nazwa": "B", "email_target": "b@b.pl"},
+    ]
+    merged = scraper.merge_pipeline_rows(existing, incoming)
+    by_url = {r["url"]: r for r in merged}
+    assert by_url["https://a.pl"]["email_target"] == "old@a.pl"
+    assert by_url["https://a.pl"]["telefon"] == "500100200"
+    assert by_url["https://b.pl"]["nazwa"] == "B"
+
+
+def test_kontakte_excel_has_english_product_columns():
+    assert scraper.EXPORT_COLUMNS == [
+        "Name of Company",
+        "Line of business",
+        "Company website",
+        "E-Mail",
+        "Phone number",
+        "Region",
+        "Localisation",
+        "Postcode",
+        "Tax Identification Number",
+    ]
+    row = scraper.row_to_excel_kontakte_columns(
+        {
+            "nazwa": "Hurtownia Alpha",
+            "email_target": "a@alpha.pl",
+            "telefon": "500100200",
+            "bundesland": "mazowieckie",
+            "adres": "ul. Testowa 1, 00-001 Warszawa",
+            "kategoria": "płytki dystrybutor",
+            "nip": "123-456-32-18",
+            "url": "https://alpha.pl",
+            "www": "https://alpha.pl",
+        },
+        "a@alpha.pl",
+    )
+    for col in scraper.EXPORT_COLUMNS:
+        assert col in row
+    assert row["Name of Company"] == "Hurtownia Alpha"
+    assert row["Line of business"] == "tiles distributor"
+    assert row["Company website"] == "https://alpha.pl"
+    assert row["E-Mail"] == "a@alpha.pl"
+    assert row["Phone number"] == "500100200"
+    assert row["Region"] == "Masovian Voivodeship"
+    assert row["Localisation"] == "St. Testowa 1, 00-001 Warsaw"
+    assert row["Postcode"] == "00-001"
+    assert row["Tax Identification Number"] == "123-456-32-18"
