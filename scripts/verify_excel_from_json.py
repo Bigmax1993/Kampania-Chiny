@@ -19,6 +19,10 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import kanbud_bootstrap as _kanbud_bootstrap  # noqa: E402
+
+_kanbud_bootstrap.ensure_import_paths(ROOT)
+
 from scripts.excel_from_json_validate import (  # noqa: E402
     fill_export_from_json,
     find_excel_gaps,

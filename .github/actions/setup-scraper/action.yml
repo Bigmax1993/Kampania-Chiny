@@ -19,6 +19,10 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-py3.12-${{ hashFiles('requirements.txt') }}
 
+    - name: Put repo + libs on PYTHONPATH
+      shell: bash
+      run: echo "PYTHONPATH=${{ github.workspace }}/libs:${{ github.workspace }}${PYTHONPATH:+:$PYTHONPATH}" >> "$GITHUB_ENV"
+
     - name: Install Python dependencies
       shell: bash
       run: pip install -r requirements.txt

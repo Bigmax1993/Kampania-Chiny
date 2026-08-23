@@ -7,7 +7,10 @@ Testy integracyjne kampanii CN — smoke, run_config, prompty Claude, workflowy.
 from __future__ import annotations
 
 import logging
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -138,6 +141,22 @@ def test_sync_drive_pl_uses_pl_campaign():
     text = (ROOT / ".github" / "workflows" / "sync-google-drive-cn.yml").read_text(encoding="utf-8")
     assert "GDRIVE_FOLDER_ID_CN" in text
     assert "--campaign cn" in text
+
+
+def test_verify_excel_from_json_imports_without_pythonpath():
+    """GHA runs this script without pytest conftest; libs must be on sys.path."""
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "verify_excel_from_json.py"), "--help"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "No module named 'polish_text'" not in (result.stderr or "")
 
 
 def test_sunday_backfill_verifies_excel_from_json_and_uploads_drive():
