@@ -17,6 +17,7 @@ from cn_materialy_inquiry_email_zh import (
     build_inquiry_signature_zh,
     dedupe_inquiry_signature,
     ensure_inquiry_signature,
+    format_inquiry_email_body_pl,
     inquiry_phone,
     inquiry_sender_name,
 )
@@ -67,6 +68,23 @@ class PlInquiryEmailTest(unittest.TestCase):
         body = f"Szanowni Państwo,\n\nZapytanie.\n\n{sig}"
         ensured = ensure_inquiry_signature(body)
         self.assertEqual(ensured.count("Z poważaniem"), 1)
+
+    def test_format_body_polish_signature_does_not_crash(self):
+        body = (
+            "Szanowni Państwo,\n\n"
+            "Zwracam się do Kim24 w sprawie współpracy dystrybucyjnej.\n\n"
+            "Z poważaniem\n"
+            "Maksym Swinczak"
+        )
+        formatted = format_inquiry_email_body_pl(body)
+        self.assertIn("Z poważaniem,", formatted)
+        self.assertIn("Maksym Swinczak", formatted)
+
+    def test_format_body_chinese_signature_still_works(self):
+        body = "尊敬的合作伙伴：询盘内容。此致敬礼\nMaksym Swinczak"
+        formatted = format_inquiry_email_body_pl(body)
+        self.assertIn("此致敬礼,", formatted)
+        self.assertIn("Maksym Swinczak", formatted)
 
 
 if __name__ == "__main__":

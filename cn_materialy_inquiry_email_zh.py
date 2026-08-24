@@ -248,7 +248,10 @@ def _normalize_signature_lines_pl(text: str) -> str:
     if not match:
         return text
     before = text[: match.start()].rstrip()
-    marker = match.group(1)
+    # Grupa 1 = 此致敬礼, grupa 2 = Z poważaniem; match.group(1) jest None przy PL.
+    marker = next((g for g in match.groups() if g), "")
+    if not marker:
+        return text
     if not marker.endswith(","):
         marker = marker + ","
     rest = text[match.end() :].strip()
