@@ -12,6 +12,54 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+def _nip_from_serper(company_name: str, website: str, logger: logging.Logger) -> str:
+    """Szuka NIP w wynikach Google (Serper), gdy strony Kontakt nie publikują NIP."""
+    import requests
+
+    from cn_contact_fields import extract_pl_nip_from_text, normalize_pl_nip
+    from scraper_env import get_serper_api_key
+
+    api_key = get_serper_api_key()
+    if not api_key:
+        return ""
+    name = (company_name or "").strip()
+    domain = ""
+    try:
+        from urllib.parse import urlparse
+
+        domain = (urlparse(website).netloc or "").replace("www.", "")
+    except Exception:
+        domain = ""
+    queries = []
+    if name:
+        queries.append(f"{name} NIP")
+        queries.append(f'"{name}" NIP Polska')
+    if domain:
+        queries.append(f"NIP site:{domain}")
+        queries.append(f"{domain} NIP")
+    for q in queries[:3]:
+        try:
+            r = requests.post(
+                "https://google.serper.dev/search",
+                headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
+                json={"q": q, "gl": "pl", "hl": "pl", "num": 8},
+                timeout=30,
+            )
+            r.raise_for_status()
+            data = r.json()
+            blob = " ".join(
+                f"{item.get('title') or ''} {item.get('snippet') or ''}"
+                for item in (data.get("organic") or [])
+            )
+            nip = normalize_pl_nip(extract_pl_nip_from_text(blob) or "")
+            if nip:
+                logger.info("Serper NIP %s ← query=%s", nip, q)
+                return nip
+        except Exception as exc:
+            logger.warning("Serper NIP fail %s: %s", q, exc)
+    return ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -48,6 +96,7 @@ def main() -> int:
     if nip_col not in df.columns:
         print(f"Brak kolumny {nip_col}: {list(df.columns)}", file=sys.stderr)
         return 1
+    name_col = "Name of Company" if "Name of Company" in df.columns else df.columns[0]
     url_col = "URL" if "URL" in df.columns else None
     www_col = "Company website" if "Company website" in df.columns else None
 
@@ -65,11 +114,19 @@ def main() -> int:
         if not website.startswith("http"):
             continue
         checked += 1
+        company = str(row.get(name_col) or "").strip()
         try:
             collected = collect_contacts_from_contact_pages(website, logger, cache={})
             nip = normalize_pl_nip(str(collected.get("nip") or "")) or ""
             if not nip:
-                nip = tax_id_from_row({"nip": collected.get("nip"), "page_snippet": collected.get("page_snippet")})
+                nip = tax_id_from_row(
+                    {
+                        "nip": collected.get("nip"),
+                        "page_snippet": collected.get("page_snippet"),
+                    }
+                )
+            if not nip:
+                nip = _nip_from_serper(company, website, logger)
             if nip:
                 df.at[idx, nip_col] = nip
                 filled += 1
@@ -80,7 +137,6 @@ def main() -> int:
             print(f"błąd {website}: {exc}")
 
     sheets[args.sheet] = df
-    # Zachowaj kolejność arkuszy i kolumn — tylko nadpisz wartości.
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         for name, sheet_df in sheets.items():
             sheet_df.to_excel(writer, sheet_name=name, index=False)
