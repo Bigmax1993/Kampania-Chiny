@@ -89,6 +89,8 @@ jobs:
           CFG="--run-config run_config/cn_materialy.json"
           # Tylko pending — NIE --reverify-all (kasowało firmy z Kontakte przy ostrym filtrze).
           python cn_materialy_scraper.py $CFG --verify-pending-contacts
+          # NIP/telefon/mail ze stron Kontakt (firmy z Prowincje bez crawl).
+          python cn_materialy_scraper.py $CFG --backfill-contact-fields-from-www
           python cn_materialy_scraper.py $CFG --backfill-emails-from-cache
           python cn_materialy_scraper.py $CFG --rebuild-from-cache
 

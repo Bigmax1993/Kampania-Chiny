@@ -5124,6 +5124,98 @@ def log_email_pick_decision(
         logger.info(msg)
 
 
+def backfill_contact_fields_from_www(
+    all_rows: list,
+    cache: dict,
+    logger: logging.Logger,
+) -> dict:
+    """
+    Uzupełnia NIP / telefon / e-mail z stron Kontakt — bez ponownej weryfikacji GU.
+    Dla firm odzyskanych z Prowincje (sama nazwa+URL) inaczej kolumna Tax ID zostaje pusta.
+    """
+    stats = {
+        "checked": 0,
+        "nip_filled": 0,
+        "email_filled": 0,
+        "phone_filled": 0,
+        "errors": 0,
+        "skipped": 0,
+    }
+    contacts = cache.setdefault("contacts", {})
+    for idx, row in enumerate(list(all_rows)):
+        row = normalize_row_company_name(dict(row))
+        place_url = (row.get("url") or row.get("www") or row.get("official_website") or "").strip()
+        website = normalize_website(
+            row.get("www") or row.get("official_website") or place_url
+        )
+        if not website:
+            stats["skipped"] += 1
+            continue
+        had_nip = bool(tax_id_from_row(row))
+        had_email = bool((row.get("email_target") or "").strip())
+        had_phone = bool(
+            (row.get("telefon") or row.get("phones_found") or "").strip()
+        )
+        if had_nip and had_email and had_phone:
+            stats["skipped"] += 1
+            continue
+        stats["checked"] += 1
+        seed = bool(row.get("from_existing_excel"))
+        try:
+            collected = collect_contacts_from_website(website, logger, cache=cache)
+            updated = reconcile_contact_sources(row, collected)
+            if seed:
+                updated["from_existing_excel"] = True
+            if collected.get("page_snippet") and not (updated.get("page_snippet") or "").strip():
+                updated["page_snippet"] = collected["page_snippet"]
+            emails = list(collected.get("emails") or [])
+            impressum = list(collected.get("impressum_emails") or [])
+            if emails:
+                cleaned = filter_commercial_emails(emails)
+                if cleaned:
+                    updated["emails_found"] = ", ".join(cleaned)
+            if not (updated.get("email_target") or "").strip() and (
+                emails or impressum
+            ):
+                target, score, method = pick_email_with_impressum_priority(
+                    emails, impressum, website
+                )
+                if target and not is_non_commercial_email(target):
+                    updated["email_target"] = target
+                    updated["email_target_score"] = score
+                    updated["email_pick_method"] = method or "www_backfill"
+                    if (updated.get("email_status") or "") in ("", "no_suitable_email"):
+                        updated["email_status"] = "www_backfill"
+            if not (updated.get("telefon") or "").strip() and collected.get("phones"):
+                updated["telefon"] = (collected["phones"] or [""])[0]
+                updated["phones_found"] = ", ".join(collected.get("phones") or [])
+            nip_now = tax_id_from_row(updated)
+            if nip_now and not had_nip:
+                stats["nip_filled"] += 1
+            if (updated.get("email_target") or "").strip() and not had_email:
+                stats["email_filled"] += 1
+            if (updated.get("telefon") or updated.get("phones_found") or "").strip() and not had_phone:
+                stats["phone_filled"] += 1
+            all_rows[idx] = updated
+            cache_key = (updated.get("url") or place_url or website).strip()
+            if cache_key:
+                info = contacts.setdefault(cache_key, {})
+                info.update(pipeline_row_to_contact_info(updated))
+        except Exception as exc:
+            stats["errors"] += 1
+            logger.warning("WWW backfill pól kontaktowych błąd %s: %s", website, exc)
+    logger.info(
+        "WWW backfill pól: checked=%s nip+=%s email+=%s phone+=%s errors=%s skip=%s",
+        stats["checked"],
+        stats["nip_filled"],
+        stats["email_filled"],
+        stats["phone_filled"],
+        stats["errors"],
+        stats["skipped"],
+    )
+    return stats
+
+
 def backfill_emails_in_cache(cache: dict, logger: logging.Logger) -> dict:
     """
     Przelicza email_target z emails_found (nowe reguły Punycode / filtr śmieci).
@@ -6994,6 +7086,22 @@ if __name__ == "__main__":
             if SEND_WINDOW_DISABLED:
                 extra_kw["ignore_send_window"] = True
             print("[TRYB] Tylko wysyłka maili z cache (bez nowego wyszukiwania).")
+        if "--backfill-contact-fields-from-www" in sys.argv:
+            logger = setup_logging()
+            cache = load_cache(logger)
+            all_rows, _ = load_existing_output(OUTPUT_FILE, logger)
+            stats = backfill_contact_fields_from_www(all_rows, cache, logger)
+            save_cache(cache, logger)
+            save_excel(all_rows, OUTPUT_FILE, logger, cache=cache)
+            with_nip = sum(1 for r in all_rows if tax_id_from_row(r))
+            print(
+                f"[WWW-FIELDS] NIP/telefon/e-mail z stron Kontakt → {OUTPUT_FILE}\n"
+                f"  checked={stats['checked']}, nip+={stats['nip_filled']}, "
+                f"email+={stats['email_filled']}, phone+={stats['phone_filled']}, "
+                f"errors={stats['errors']}, skip={stats['skipped']}\n"
+                f"  Excel: {len(all_rows)} firm, z NIP={with_nip}"
+            )
+            raise SystemExit(0)
         if "--backfill-emails-from-cache" in sys.argv:
             logger = setup_logging()
             cache = load_cache(logger)
