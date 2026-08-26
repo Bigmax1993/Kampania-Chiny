@@ -1,0 +1,114 @@
+name: CN sync discovery Excel to Drive
+# Kampania-Chiny Actions index
+# Wgrywa Excel z artefaktu discovery na Drive (ten sam uklad) + uzupelnia NIP ze stron Kontakt.
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: "Run ID artefaktu discovery (cn-materialy-wyniki-pi/fri/...)."
+        required: true
+        type: string
+      artifact_name:
+        description: "Nazwa artefaktu"
+        required: false
+        default: "cn-materialy-wyniki-pi"
+        type: string
+      fill_nip:
+        description: "Uzupelnij NIP/telefon/e-mail ze stron Kontakt przed uploadem"
+        type: boolean
+        default: true
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: cn-pipeline
+  cancel-in-progress: false
+
+env:
+  SCRAPER_TIMEZONE: Asia/Shanghai
+  KANBUD_PROJECT_ROOT: ${{ github.workspace }}/libs
+  GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID_CN }}
+  # Nadpisz plik na Drive — bez merge ze starym (Prowincje-only) Excel
+  GDRIVE_VERSION_XLSX: "0"
+  GDRIVE_APPEND_XLSX: "0"
+  CLAUDE_UNLIMITED: "1"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-scraper
+
+      - name: Install Google Drive dependencies
+        run: pip install -r requirements-drive.txt
+
+      - name: Download discovery artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.inputs.artifact_name }}
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.inputs.artifact_run_id }}
+          path: .
+
+      - name: Show Excel before
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+          p = Path("Wyniki/cn_materialy_kontakte.xlsx")
+          df = pd.read_excel(p, sheet_name="Kontakte")
+          print("Kontakte rows=", len(df))
+          print("cols=", list(df.columns))
+          print(df[["Name of Company", "E-Mail", "Tax Identification Number", "URL"]].fillna("").head(20).to_string())
+          try:
+              prov = pd.read_excel(p, sheet_name="Prowincje")
+              print("Prowincje rows=", len(prov))
+          except Exception as e:
+              print("Prowincje:", e)
+          PY
+
+      - name: Fill NIP from Kontakt pages (keep Excel layout)
+        if: ${{ github.event.inputs.fill_nip == 'true' }}
+        run: |
+          python scripts/fill_nip_in_xlsx.py --xlsx Wyniki/cn_materialy_kontakte.xlsx
+
+      - name: Show Excel after NIP fill
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+          p = Path("Wyniki/cn_materialy_kontakte.xlsx")
+          df = pd.read_excel(p, sheet_name="Kontakte")
+          nip = df["Tax Identification Number"].fillna("").astype(str).str.strip()
+          print("Kontakte rows=", len(df), "with NIP=", int((nip != "").sum()))
+          print(df[["Name of Company", "E-Mail", "Tax Identification Number", "URL"]].fillna("").to_string())
+          PY
+
+      - name: Upload Excel to Google Drive (replace)
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_OAUTH_CLIENT_ID: ${{ secrets.GDRIVE_OAUTH_CLIENT_ID }}
+          GDRIVE_OAUTH_CLIENT_SECRET: ${{ secrets.GDRIVE_OAUTH_CLIENT_SECRET }}
+          GDRIVE_OAUTH_REFRESH_TOKEN: ${{ secrets.GDRIVE_OAUTH_REFRESH_TOKEN }}
+          GDRIVE_IMPERSONATE_EMAIL: ${{ secrets.GDRIVE_IMPERSONATE_EMAIL }}
+          GDRIVE_SHARED_DRIVE_ID: ${{ secrets.GDRIVE_SHARED_DRIVE_ID }}
+        run: |
+          python scripts/gdrive_upload_wyniki.py --campaign-dir . --campaign cn
+
+      - name: Upload Wyniki artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cn-materialy-wyniki-drive-sync
+          path: |
+            Wyniki/
+            wyslane/
