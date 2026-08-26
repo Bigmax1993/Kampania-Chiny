@@ -5131,13 +5131,14 @@ def backfill_contact_fields_from_www(
 ) -> dict:
     """
     Uzupełnia NIP / telefon / e-mail z stron Kontakt — bez ponownej weryfikacji GU.
-    Dla firm odzyskanych z Prowincje (sama nazwa+URL) inaczej kolumna Tax ID zostaje pusta.
+    Zawsze świeży crawl (nie stary website_crawl z artefaktu) + Claude gdy regex pusty.
     """
     stats = {
         "checked": 0,
         "nip_filled": 0,
         "email_filled": 0,
         "phone_filled": 0,
+        "claude_used": 0,
         "errors": 0,
         "skipped": 0,
     }
@@ -5161,12 +5162,61 @@ def backfill_contact_fields_from_www(
             continue
         stats["checked"] += 1
         seed = bool(row.get("from_existing_excel"))
+        company_for_email = (
+            row.get("company_name_clean") or row.get("nazwa") or ""
+        ).strip()
         try:
-            collected = collect_contacts_from_website(website, logger, cache=cache)
+            # Świeży crawl — cache z artefaktu discovery często bez Kontakt/NIP.
+            collected = collect_contacts_from_website(
+                website, logger, cache=cache, force_refresh=True
+            )
+            need_claude = (
+                ENABLE_CLAUDE_CONTACT_EXTRACT
+                and (
+                    not (collected.get("emails") or collected.get("impressum_emails"))
+                    or not (collected.get("phones") or [])
+                    or not (collected.get("nip") or "")
+                )
+            )
+            if need_claude:
+                crawl_text = _get_website_crawl_text(
+                    website, cache, purpose="contact"
+                ) or collected.get("page_snippet") or ""
+                if crawl_text.strip():
+                    from claude_contact_extract import (
+                        claude_extract_contacts_from_pages,
+                        merge_claude_contacts_into_collected,
+                    )
+
+                    console_step(
+                        f"Claude Kontaktsuche (backfill pól): {website}"
+                    )
+                    parsed = claude_extract_contacts_from_pages(
+                        company_for_email,
+                        website,
+                        crawl_text,
+                        logger,
+                        cache,
+                        cache_key=place_url or website,
+                        on_step=console_step,
+                    )
+                    if parsed and (
+                        parsed.get("emails")
+                        or parsed.get("phones")
+                        or parsed.get("nip")
+                    ):
+                        collected = merge_claude_contacts_into_collected(
+                            collected, parsed
+                        )
+                        if parsed.get("nip") and not collected.get("nip"):
+                            collected["nip"] = parsed["nip"]
+                        stats["claude_used"] += 1
             updated = reconcile_contact_sources(row, collected)
             if seed:
                 updated["from_existing_excel"] = True
-            if collected.get("page_snippet") and not (updated.get("page_snippet") or "").strip():
+            if collected.get("page_snippet") and not (
+                updated.get("page_snippet") or ""
+            ).strip():
                 updated["page_snippet"] = collected["page_snippet"]
             emails = list(collected.get("emails") or [])
             impressum = list(collected.get("impressum_emails") or [])
@@ -5174,6 +5224,10 @@ def backfill_contact_fields_from_www(
                 cleaned = filter_commercial_emails(emails)
                 if cleaned:
                     updated["emails_found"] = ", ".join(cleaned)
+            if impressum:
+                updated["impressum_emails_found"] = ", ".join(
+                    filter_commercial_emails(impressum)
+                )
             if not (updated.get("email_target") or "").strip() and (
                 emails or impressum
             ):
@@ -5184,17 +5238,24 @@ def backfill_contact_fields_from_www(
                     updated["email_target"] = target
                     updated["email_target_score"] = score
                     updated["email_pick_method"] = method or "www_backfill"
-                    if (updated.get("email_status") or "") in ("", "no_suitable_email"):
+                    if (updated.get("email_status") or "") in (
+                        "",
+                        "no_suitable_email",
+                    ):
                         updated["email_status"] = "www_backfill"
             if not (updated.get("telefon") or "").strip() and collected.get("phones"):
                 updated["telefon"] = (collected["phones"] or [""])[0]
                 updated["phones_found"] = ", ".join(collected.get("phones") or [])
+            if collected.get("nip") and not tax_id_from_row(updated):
+                updated["nip"] = collected["nip"]
             nip_now = tax_id_from_row(updated)
             if nip_now and not had_nip:
                 stats["nip_filled"] += 1
             if (updated.get("email_target") or "").strip() and not had_email:
                 stats["email_filled"] += 1
-            if (updated.get("telefon") or updated.get("phones_found") or "").strip() and not had_phone:
+            if (
+                updated.get("telefon") or updated.get("phones_found") or ""
+            ).strip() and not had_phone:
                 stats["phone_filled"] += 1
             all_rows[idx] = updated
             cache_key = (updated.get("url") or place_url or website).strip()
@@ -5205,11 +5266,12 @@ def backfill_contact_fields_from_www(
             stats["errors"] += 1
             logger.warning("WWW backfill pól kontaktowych błąd %s: %s", website, exc)
     logger.info(
-        "WWW backfill pól: checked=%s nip+=%s email+=%s phone+=%s errors=%s skip=%s",
+        "WWW backfill pól: checked=%s nip+=%s email+=%s phone+=%s claude=%s errors=%s skip=%s",
         stats["checked"],
         stats["nip_filled"],
         stats["email_filled"],
         stats["phone_filled"],
+        stats["claude_used"],
         stats["errors"],
         stats["skipped"],
     )
@@ -5511,7 +5573,11 @@ def resolve_inquiry_email_target(
 
 
 def collect_contacts_from_website(
-    website: str, logger: logging.Logger, cache: dict | None = None
+    website: str,
+    logger: logging.Logger,
+    cache: dict | None = None,
+    *,
+    force_refresh: bool = False,
 ) -> dict:
     website = normalize_website(website)
     if not website:
@@ -5526,9 +5592,11 @@ def collect_contacts_from_website(
             "nip": "",
         }
     console_step(f"Kontakte sammeln (nach WWW-Prüfung): {website}")
-    crawl_cache = (cache or {}).get("website_crawl") or {}
+    crawl_cache = (cache or {}).setdefault("website_crawl", {})
+    if force_refresh:
+        crawl_cache.pop(website, None)
     crawl = crawl_cache.get(website)
-    if crawl is not None:
+    if crawl is not None and not force_refresh:
         return merge_contacts_from_crawl(crawl, website)
 
     crawl_result, _ = _crawl_website_for_company(website, logger, cache)
@@ -7098,6 +7166,7 @@ if __name__ == "__main__":
                 f"[WWW-FIELDS] NIP/telefon/e-mail z stron Kontakt → {OUTPUT_FILE}\n"
                 f"  checked={stats['checked']}, nip+={stats['nip_filled']}, "
                 f"email+={stats['email_filled']}, phone+={stats['phone_filled']}, "
+                f"claude={stats.get('claude_used', 0)}, "
                 f"errors={stats['errors']}, skip={stats['skipped']}\n"
                 f"  Excel: {len(all_rows)} firm, z NIP={with_nip}"
             )
