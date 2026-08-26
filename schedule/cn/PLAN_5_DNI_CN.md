@@ -38,11 +38,13 @@ Secret Drive: `GDRIVE_FOLDER_ID_CN` = `1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC`
 Folder: [CN Materialy — Google Drive](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC?usp=drive_link)
 
 Plik Excel: `cn_materialy_kontakte.xlsx`  
-- **Kontakte** — pełne kontakty (e-mail, telefon, Tax Identification Number / NIP, …)  
+- **Kontakte** — pełne kontakty (e-mail, telefon, Tax Identification Number / NIP = **10 cyfr**, …)  
 - **Prowincje** — tylko Name of Company, Region, Localisation, URL  
 - **Info** — opis pliku  
 
-Szczegóły kolumn: [`docs/CN_MATERIALY.md`](../../docs/CN_MATERIALY.md#excel-i-google-drive).
+Szczegóły kolumn i ścieżki NIP (Serper + Claude): [`docs/CN_MATERIALY.md`](../../docs/CN_MATERIALY.md#excel-i-google-drive).
+
+Ręczne uzupełnienie NIP na Drive: workflow **CN fill NIP on Drive Excel** (`cn_fill_nip_drive.yml`, kolejka `cn-drive-nip`).
 
 Concurrency: `cn-pipeline` — osobne repo, bez kolizji z PL/UA.
 

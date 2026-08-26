@@ -11,13 +11,18 @@ Kampania siostrzana (Ukraina): [wyszukiwarka-materialow-budowlanych-ukraina](htt
 
 ## Pipeline
 
-**Serper (gl=pl, hl=pl) → crawl www → Claude verify (PL dystrybutor) → Excel → maile PL**
+**Serper (gl=pl, hl=pl) → crawl www → Claude verify (PL dystrybutor) → Excel (NIP 10 cyfr) → maile PL**
+
+Przy braku NIP w JSON: **Serper → requests/BS4 → Claude** → zapis do JSON i Excela (`serper_nip_resolve.py`).
 
 Szczegóły: [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md) · maile: [`docs/MAILE.md`](docs/MAILE.md) · Drive: [`docs/GOOGLE_DRIVE.md`](docs/GOOGLE_DRIVE.md)
 
 | Moduł | Plik |
 |-------|------|
 | Scraper | `cn_materialy_scraper.py` |
+| NIP (regex + normalizacja 10 cyfr) | `cn_contact_fields.py` |
+| Brak NIP → Serper + Claude | `serper_nip_resolve.py` |
+| Fill NIP w Excelu | `scripts/fill_nip_in_xlsx.py` |
 | Frazy per województwo | `cn_province_keywords.py` |
 | Rotacja województw | `cn_province_rotation.py` |
 | Filtr dystrybutorów | `cn_materialy_supplier_filter.py` |
@@ -28,7 +33,7 @@ Maile po polsku do dystrybutorów w Polsce, **bez telefonu i bez strony www**, *
 
 Wyniki: `Wyniki/cn_materialy_cache.json`, `cn_materialy_kontakte.xlsx` (lokalnie / artefakt Actions; produkcja na [Google Drive](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC)).
 
-Excel — arkusz **Kontakte** = pełne dane (w tym Tax Identification Number / NIP); arkusz **Prowincje** = tylko indeks regionu. Szczegóły: [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md#excel-i-google-drive).
+Excel — arkusz **Kontakte** = pełne dane (Tax Identification Number / NIP = **10 cyfr**, bez `-` i spacji); arkusz **Prowincje** = tylko indeks regionu. Szczegóły: [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md#excel-i-google-drive).
 
 ---
 
@@ -55,6 +60,7 @@ Skopiuj `.env.example` → `.env` (lokalnie; na CI ustaw [GitHub Secrets](#githu
 ```powershell
 $env:KANBUD_PROJECT_ROOT = "$PWD\libs"
 python cn_materialy_scraper.py --test
+python -m unittest discover -s tests -p "test_*.py" -q
 python -m pytest tests/ -q
 ```
 
@@ -107,9 +113,11 @@ powershell -ExecutionPolicy Bypass -File scripts\run_full_pipeline_gha.ps1
 
 ## GitHub Actions
 
-8 workflowów: `cn_materialy_{pi,thu,mon,tue,fri}.yml`, `sync-google-drive-cn.yml`, `tests.yml`, `ci-deploy.yml`.
+Główne workflowy: `cn_materialy_{pi,thu,mon,tue,fri}.yml`, `sync-google-drive-cn.yml`, `cn_fill_nip_drive.yml`, `cn_sync_discovery_excel_drive.yml`, `tests.yml`, `ci-deploy.yml`.
 
-Concurrency: `cn-pipeline` (w tym repo).
+Concurrency: `cn-pipeline` (pipeline tydzień); `cn-drive-nip` (uzupełnianie NIP na Drive — nie blokuje discovery).
+
+Produkcyjny mirror: [Kampania-Chiny](https://github.com/Bigmax1993/Kampania-Chiny) — `gh workflow run … -R Bigmax1993/Kampania-Chiny`.
 
 ### GitHub Secrets
 
@@ -146,12 +154,17 @@ Końcowy Excel: [folder Drive CN](https://drive.google.com/drive/folders/1ZzEvH0
 
 ```
 ├── cn_materialy_scraper.py
+├── cn_contact_fields.py
+├── serper_nip_resolve.py
 ├── cn_province_rotation.py
 ├── run_config/cn_materialy.json
 ├── schedule/cn/
 ├── .github/workflows/cn_materialy_*.yml
+├── .github/workflows/cn_fill_nip_drive.yml
+├── .github/workflows/cn_sync_discovery_excel_drive.yml
 ├── docs/CN_MATERIALY.md
+├── scripts/fill_nip_in_xlsx.py
 ├── scripts/run_full_pipeline_gha.ps1
-├── tests/test_cn_* + test_repo_isolation.py
+├── tests/test_cn_* + test_serper_nip_resolve.py + test_repo_isolation.py
 └── Wyniki/
 ```

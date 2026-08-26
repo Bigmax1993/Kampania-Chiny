@@ -1,6 +1,7 @@
 # GitHub Actions — kampania CN
 
-Repozytorium: [wyszukiwarka-materialow-budowlanych-chiny](https://github.com/Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny)
+Repozytorium: [wyszukiwarka-materialow-budowlanych-chiny](https://github.com/Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny)  
+Produkcyjny mirror Actions: [Kampania-Chiny](https://github.com/Bigmax1993/Kampania-Chiny)
 
 Kampania: [`docs/CN_MATERIALY.md`](CN_MATERIALY.md)  
 Maile: [`docs/MAILE.md`](MAILE.md)  
@@ -13,16 +14,23 @@ Drive: [`docs/GOOGLE_DRIVE.md`](GOOGLE_DRIVE.md)
 | **Tests** | `tests.yml` | push, PR | smoke + pytest + `test_repo_isolation` |
 | **CI Deploy** | `ci-deploy.yml` | push | smoke + secrets + dry-run maili |
 | **CN discovery** | `cn_materialy_pi.yml` | cron, ręcznie | Discovery pon–pt → `cn-materialy-wyniki-pi` |
-| **CN niedziela backfill** | `cn_materialy_thu.yml` | cron, ręcznie | Crawl www (w tym NIP ze stron Kontakt) → append do istniejącego Excela na Drive → **2×** JSON→Excel → Drive (ten sam plik) → `cn-materialy-wyniki-thu` |
-| **CN poniedzialek prep** | `cn_materialy_mon.yml` | cron, ręcznie | Rebuild Excel → **2×** JSON→Excel → Drive (append do tego samego pliku) → `cn-materialy-wyniki-mon` |
+| **CN niedziela backfill** | `cn_materialy_thu.yml` | cron, ręcznie | Crawl www (NIP ze stron Kontakt + Serper/Claude przy braku) → append Excela na Drive → **2×** JSON→Excel → Drive → `cn-materialy-wyniki-thu` |
+| **CN poniedzialek prep** | `cn_materialy_mon.yml` | cron, ręcznie | Rebuild Excel → **2×** JSON→Excel → Drive (append) → `cn-materialy-wyniki-mon` |
 | **CN poniedzialek send** | `cn_materialy_tue.yml` | cron, ręcznie | Wysyłka partia 1 (300) → `cn-materialy-wyniki-tue` |
 | **CN wtorek send** | `cn_materialy_fri.yml` | cron, ręcznie | Wysyłka partia 2 → `cn-materialy-wyniki-fri` |
 | **PL rebuild Excel** | `cn_materialy_rebuild_excel.yml` | ręcznie | Przebudowa `cn_materialy_kontakte.xlsx` z cache + opcjonalny upload Drive |
 | **Sync wyniki Google Drive CN** | `sync-google-drive-cn.yml` | cron pon 10:00, ręcznie | Upload `Wyniki/` → [folder CN](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC) |
+| **CN sync discovery Excel to Drive** | `cn_sync_discovery_excel_drive.yml` | ręcznie | Pobiera Excel z artefaktu discovery → uzupełnia NIP → **replace** na Drive (ten sam układ co artefakt) |
+| **CN fill NIP on Drive Excel** | `cn_fill_nip_drive.yml` | ręcznie | Pobiera aktualny Excel z Drive → Serper+BS4+Claude na braki NIP → format 10 cyfr (tekst) → **replace** na Drive |
 
-Excel na Drive: arkusz **Kontakte** = pełne kontakty; **Prowincje** = indeks regionu. Opis kolumn: [`CN_MATERIALY.md`](CN_MATERIALY.md#excel-i-google-drive).
+Excel na Drive: arkusz **Kontakte** = pełne kontakty (NIP = 10 cyfr); **Prowincje** = indeks regionu. Opis kolumn: [`CN_MATERIALY.md`](CN_MATERIALY.md#excel-i-google-drive).
 
-Concurrency: `cn-pipeline` (w tym repo).
+### Concurrency
+
+| Grupa | Workflowy |
+|-------|-----------|
+| `cn-pipeline` | discovery, backfill, prep, send, sync artefaktów |
+| `cn-drive-nip` | **CN fill NIP on Drive Excel** (nie czeka na długie discovery) |
 
 ## Harmonogram cron (Asia/Shanghai)
 
@@ -43,8 +51,8 @@ Concurrency: `cn-pipeline` (w tym repo).
 
 | Secret | Wymagany | Opis |
 |--------|----------|------|
-| `SERPER_API_KEY` | tak | API Serper |
-| `ANTHROPIC_API_KEY` | tak | Claude API |
+| `SERPER_API_KEY` | tak | API Serper (także uzupełnianie NIP) |
+| `ANTHROPIC_API_KEY` | tak | Claude API (verify NIP + maile) |
 | `MAIL_USER`, `MAIL_PASSWORD` | tak | SMTP / Gmail |
 | `MAIL_SENDER_NAME` | tak | Maksym Swinczak |
 | `GDRIVE_FOLDER_ID_CN` | tak | `1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC` |
@@ -60,6 +68,8 @@ niedziela backfill → cn-materialy-wyniki-thu  (+ Excel na Drive)
 pon prep → cn-materialy-wyniki-mon
 pon send → cn-materialy-wyniki-tue
 wt send → cn-materialy-wyniki-fri
+fill NIP Drive → cn-materialy-wyniki-nip-fill
+sync discovery→Drive → cn-materialy-wyniki-drive-sync
 ```
 
 **CN send:** bez załącznika; maile po polsku, spersonalizowane per firma (bez telefonu i bez strony www).
@@ -67,13 +77,25 @@ wt send → cn-materialy-wyniki-fri
 ## Ręczne uruchomienie
 
 ```powershell
-gh workflow run "CN discovery" -R Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny
-gh workflow run "CN discovery" -R Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny -f discovery_phase=mon
-gh workflow run "CN niedziela backfill" -R Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny
-gh workflow run "Sync wyniki Google Drive CN" -R Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny
-gh workflow run "CN poniedzialek prep" -R Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny
-gh workflow run "CN poniedzialek send" -R Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny -f force_resend=true
-gh workflow run "CN wtorek send" -R Bigmax1993/wyszukiwarka-materialow-budowlanych-chiny -f force_resend=true
+# Produkcja Actions: Bigmax1993/Kampania-Chiny
+gh workflow run "CN discovery" -R Bigmax1993/Kampania-Chiny
+gh workflow run "CN discovery" -R Bigmax1993/Kampania-Chiny -f discovery_phase=mon
+gh workflow run "CN niedziela backfill" -R Bigmax1993/Kampania-Chiny
+gh workflow run "Sync wyniki Google Drive CN" -R Bigmax1993/Kampania-Chiny
+gh workflow run "CN poniedzialek prep" -R Bigmax1993/Kampania-Chiny
+gh workflow run "CN poniedzialek send" -R Bigmax1993/Kampania-Chiny -f force_resend=true
+gh workflow run "CN wtorek send" -R Bigmax1993/Kampania-Chiny -f force_resend=true
+
+# NIP / Excel na Drive
+gh workflow run "CN fill NIP on Drive Excel" -R Bigmax1993/Kampania-Chiny -f fill_nip=true
+gh workflow run "CN sync discovery Excel to Drive" -R Bigmax1993/Kampania-Chiny `
+  -f artifact_run_id=RUN_ID -f artifact_name=cn-materialy-wyniki-thu -f fill_nip=true
+```
+
+Lokalnie (bez GHA):
+
+```powershell
+python scripts/fill_nip_in_xlsx.py --xlsx Wyniki\cn_materialy_kontakte.xlsx
 ```
 
 Pełny łańcuch: `scripts/run_full_pipeline_gha.ps1`  

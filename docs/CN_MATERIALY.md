@@ -34,6 +34,7 @@ Serper (gl=pl, hl=pl)
   → crawl www
   → Claude verify (firma w Polsce)
   → Excel cn_materialy_kontakte.xlsx
+       (NIP: Kontakt → przy braku Serper+BS4+Claude → 10 cyfr)
   → maile PL (Claude, unikalne per firma)
   → Google Drive
 ```
@@ -122,7 +123,7 @@ Wartości po angielsku; **Name of Company** bez tłumaczenia.
 | Region | województwo (EN, np. Masovian Voivodeship) |
 | Localisation | adres (EN: St. / Warsaw) |
 | Postcode | kod pocztowy PL (XX-XXX) |
-| Tax Identification Number | NIP PL (10 cyfr, bez spacji i myslnikow) |
+| Tax Identification Number | NIP PL (**10 cyfr**, bez spacji i myślników) |
 | URL | bazowy URL firmy |
 
 ### Prowincje — kolumny
@@ -136,9 +137,22 @@ Wartości po angielsku; **Name of Company** bez tłumaczenia.
 
 ### Tax Identification Number (NIP)
 
-NIP jest wyciągany z crawlowanej strony (priorytet: `/kontakt`, `/o-firmie`, `/dane-firmy`, stopka) przez `cn_contact_fields.extract_pl_nip_from_text` — etykiety m.in. `NIP`, `Nr NIP`, `Tax Identification Number`, `PL` + 10 cyfr.  
+**Format w Excelu i JSON:** zawsze **10 cyfr** bez spacji i myślników (np. `7010645831`). Kolumna jest zapisywana jako **tekst** (`@`), żeby Excel nie zamieniał NIP na float (`…3271.0`).
+
+**Ścieżka uzupełniania** (gdy brak NIP w JSON / wierszu):
+
+1. Strony Kontakt / o-firmie (`collect_contacts_from_contact_pages`) + luźny regex (`cn_contact_fields.extract_pl_nip_from_text` / `extract_all_pl_nips_from_text`)
+2. Jeśli nadal brak → **Serper** (`firma NIP`, `NIP site:domena`, …)
+3. Pobranie top stron z wyników (**requests + BeautifulSoup**)
+4. **Claude** decyduje, czy kandydat NIP należy do tej firmy (`serper_nip_resolve.resolve_missing_nip_via_serper`, prompt `build_nip_verify_prompt`)
+5. Przy `match=true` → zapis do **JSON** (`contacts[].nip`) i nadpisanie komórki **Tax Identification Number** w Excelu
+
+Regex akceptuje m.in. `NIP`, `N.I.P.`, `Nr NIP`, `Tax Identification Number`, `PL` + 10 cyfr, zapis ze spacjami / kropkami / myślnikami; po normalizacji zostaje sam ciąg 10 cyfr. Obsługiwany jest też odczyt wartości float z Excela (`5341373271.0` → `5341373271`).
+
+Moduły: `cn_contact_fields.py`, `serper_nip_resolve.py`, `scripts/fill_nip_in_xlsx.py`.
+
 Strony Kontakt trafiają na początek `page_snippet`, żeby NIP nie wypadał poza limit 3500 znaków.  
-Po zmianie logiki NIP potrzebny jest **crawl / backfill** (same stare snippetty w cache bez NIP nie wystarczą).
+Po zmianie logiki NIP potrzebny jest **crawl / backfill** albo ręczny workflow **CN fill NIP on Drive Excel** (same stare snippetty w cache bez NIP nie wystarczą).
 
 Folder: [https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC?usp=drive_link)
 
@@ -169,7 +183,8 @@ Strefa: **Asia/Shanghai**. Szczegóły: [`docs/GITHUB_ACTIONS.md`](GITHUB_ACTION
 | Poniedziałek | 14:00 | wysyłka partia 1 |
 | Wtorek | 14:00 | wysyłka partia 2 |
 
-Concurrency: `cn-pipeline` (osobne repo — bez kolizji z PL/UA).
+Concurrency: `cn-pipeline` (osobne repo — bez kolizji z PL/UA).  
+Uzupełnianie NIP na Drive: osobna kolejka `cn-drive-nip` (nie czeka na długie discovery).
 
 ---
 
@@ -179,11 +194,13 @@ Concurrency: `cn-pipeline` (osobne repo — bez kolizji z PL/UA).
 |-------|------|
 | Scraper / Excel Kontakte + Prowincje | `cn_materialy_scraper.py` |
 | NIP, adres, nazwa (PL) | `cn_contact_fields.py` |
+| Brak NIP → Serper + BS4 + Claude | `serper_nip_resolve.py` |
+| Uzupełnianie NIP w Excelu | `scripts/fill_nip_in_xlsx.py` |
 | Tłumaczenie pól Excel (EN) | `cn_excel_en.py` |
 | Frazy i województwa | `cn_province_keywords.py` |
 | Rotacja | `cn_province_rotation.py` |
 | Filtr | `cn_materialy_supplier_filter.py` |
-| Prompty Claude | `cn_claude_prompts.py` |
+| Prompty Claude | `cn_claude_prompts.py`, `claude_prompts.py` (`build_nip_verify_prompt`) |
 | Generacja maila | `cn_claude_inquiry_email.py` |
 | Szablon / podpis | `cn_materialy_inquiry_email_zh.py` |
 | Kontekst nadawcy | `cn_regional_sender_context.py` |
@@ -200,6 +217,7 @@ Nazwy `cn_*` zostają (izolacja: w tym repo **nie** może być `pl_*.py` / `ua_*
 ```powershell
 $env:KANBUD_PROJECT_ROOT = "$PWD\libs"
 python cn_materialy_scraper.py --test
+python -m unittest discover -s tests -p "test_*.py" -q
 python -m pytest tests/ -q
 ```
 
