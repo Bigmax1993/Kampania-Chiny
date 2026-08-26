@@ -96,6 +96,10 @@ def main() -> int:
     if nip_col not in df.columns:
         print(f"Brak kolumny {nip_col}: {list(df.columns)}", file=sys.stderr)
         return 1
+    # Pusta kolumna bywa float64 — stringi NIP (701-064-…) nie wejdą bez astype(str).
+    df[nip_col] = df[nip_col].apply(
+        lambda v: "" if v is None or (isinstance(v, float) and pd.isna(v)) else str(v)
+    )
     name_col = "Name of Company" if "Name of Company" in df.columns else df.columns[0]
     url_col = "URL" if "URL" in df.columns else None
     www_col = "Company website" if "Company website" in df.columns else None
