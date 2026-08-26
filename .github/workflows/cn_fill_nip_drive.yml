@@ -14,8 +14,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: cn-pipeline
-  cancel-in-progress: false
+  # Osobna kolejka — nie blokuj Drive-fill przez długie CN discovery.
+  group: cn-drive-nip
+  cancel-in-progress: true
 
 env:
   SCRAPER_TIMEZONE: Asia/Shanghai
