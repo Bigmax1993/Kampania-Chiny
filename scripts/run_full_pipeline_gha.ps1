@@ -59,7 +59,7 @@ function Wait-GhaRun {
     if ($ContinueOnDiscoveryArtifact -and -not $StrictDiscovery) {
         if (Test-RunHasDiscoveryArtifact -RunId $RunId -AlsoCheckRunIds $script:DiscoveryRunIds) {
             $conclusion = Get-RunConclusion $RunId
-            Write-Host "UWAGA: $Name zakonczyl sie jako '$conclusion' — jest artefakt pi, kontynuuje." -ForegroundColor Yellow
+            Write-Host "UWAGA: $Name zakonczyl sie jako $conclusion - jest artefakt pi, kontynuuje." -ForegroundColor Yellow
             return
         }
     }
@@ -111,4 +111,5 @@ Invoke-GhaWorkflow "CN poniedzialek prep"
 Invoke-GhaWorkflow "CN poniedzialek send" $sendFields
 Invoke-GhaWorkflow "CN wtorek send" $sendFields
 
-Write-Host "`nPipeline PL zakonczony pomyslnie." -ForegroundColor Green
+Write-Host ""
+Write-Host "Pipeline CN zakonczony pomyslnie." -ForegroundColor Green
