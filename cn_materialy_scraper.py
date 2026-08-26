@@ -826,6 +826,31 @@ def save_excel(
         state_rows = build_bundesland_rows(
             rows_for_excel, require_eligible=require_eligible
         )
+        # Nigdy nie nadpisuj Excela pustką, gdy w pipeline są firmy z URL.
+        if require_eligible and not export_rows and rows_for_excel:
+            seeded = [
+                r
+                for r in rows_for_excel
+                if (
+                    (r.get("url") or r.get("www") or r.get("official_website") or "")
+                    .strip()
+                    and (
+                        r.get("company_name_clean")
+                        or r.get("nazwa")
+                        or ""
+                    ).strip()
+                )
+            ]
+            if seeded:
+                logger.warning(
+                    "Excel: filtr wyciął wszystkie wiersze — wymuszam zapis %s firm "
+                    "(seed z pipeline / Prowincje), żeby nie wyczyścić pliku",
+                    len(seeded),
+                )
+                export_rows = build_export_rows(
+                    seeded, logger=logger, cache=cache, require_eligible=False
+                )
+                state_rows = build_bundesland_rows(seeded, require_eligible=False)
         if cache is None:
             cache = {}
         cfg = ReplySyncConfig(
@@ -1608,6 +1633,10 @@ def is_row_eligible_for_excel_export(row: dict) -> bool:
         return False
     if is_retail_store_operator_contact(url=url, email=email, text=text):
         return False
+    # Już w Excelu (Kontakte/Prowincje) — nie kasuj przy verify/rebuild.
+    # Prowincje ma tylko nazwę/URL/adres; bez flagi filtr GU wycina wszystko.
+    if row.get("from_existing_excel") and url and name:
+        return True
     if (row.get("verification_reason") or "").strip() == PENDING_WWW_VERIFY_REASON:
         if not (url and name):
             return False
@@ -1852,6 +1881,7 @@ def load_existing_output(path: Path, logger: logging.Logger):
             name = (row.get("nazwa") or row.get("company_name_clean") or "").strip()
             if name.lower() == "nieznana firma" and not row.get("url"):
                 continue
+            row["from_existing_excel"] = True
             rows.append(row)
             url = (row.get("url") or "").strip()
             if url:
@@ -1881,6 +1911,8 @@ def load_existing_output(path: Path, logger: logging.Logger):
                         for r in rows
                     ):
                         continue
+                row["from_existing_excel"] = True
+                row["recovered_from_prowincje"] = True
                 rows.append(row)
                 recovered += 1
                 if url:
@@ -6895,6 +6927,20 @@ def _run_smoke_tests() -> None:
             "email_target": "",
             "retail_verified": True,
             "page_snippet": "Remont mieszkań",
+        }
+    )
+    # Seed z Prowincje (sama nazwa+URL) musi przejść — inaczej verify kasuje Kontakte.
+    assert is_row_eligible_for_excel_export(
+        {
+            "nazwa": "Ravak Pol",
+            "url": "https://ravak.pl",
+            "from_existing_excel": True,
+        }
+    )
+    assert not is_row_eligible_for_excel_export(
+        {
+            "nazwa": "Ravak Pol",
+            "url": "https://ravak.pl",
         }
     )
     assert len(SERPER_DISCOVERY_TERMS) >= 100
