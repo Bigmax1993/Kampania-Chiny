@@ -84,6 +84,15 @@ class PlContactFieldsTest(unittest.TestCase):
         )
         self.assertIn("1234563218", nips)
 
+    def test_normalize_strips_separators_and_excel_float(self):
+        from cn_contact_fields import normalize_pl_nip
+
+        self.assertEqual(normalize_pl_nip("123-456-32-18"), "1234563218")
+        self.assertEqual(normalize_pl_nip("123 456 32 18"), "1234563218")
+        self.assertEqual(normalize_pl_nip("1234563218.0"), "1234563218")
+        self.assertEqual(normalize_pl_nip(1234563218.0), "1234563218")
+        self.assertEqual(normalize_pl_nip(1234563218), "1234563218")
+
     def test_extracts_labeled_nip(self):
         from cn_contact_fields import extract_pl_nip_from_text, pl_nip_checksum_ok
 

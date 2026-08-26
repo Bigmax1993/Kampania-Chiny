@@ -302,7 +302,28 @@ _NIP_WEIGHTS = (6, 5, 7, 2, 3, 4, 5, 6, 7)
 
 def normalize_pl_nip(raw: str) -> str:
     """NIP jako 10 cyfr bez myślników i spacji (np. 1234563218)."""
-    digits = re.sub(r"\D", "", raw or "")
+    if raw is None:
+        return ""
+    # Excel/pandas często oddaje NIP jako float 5341373271.0
+    if isinstance(raw, float):
+        if raw != raw:  # NaN
+            return ""
+        if raw == int(raw) and raw >= 0:
+            digits = f"{int(raw)}"
+            return digits if len(digits) == 10 else ""
+        return ""
+    if isinstance(raw, int):
+        digits = str(raw)
+        return digits if len(digits) == 10 else ""
+    s = str(raw).strip()
+    if not s or s.lower() in ("nan", "none"):
+        return ""
+    # String z float-zapisu Excela: "5341373271.0"
+    m = re.fullmatch(r"(\d+)\.0+", s)
+    if m:
+        digits = m.group(1)
+        return digits if len(digits) == 10 else ""
+    digits = re.sub(r"\D", "", s)
     if len(digits) != 10:
         return ""
     return digits
