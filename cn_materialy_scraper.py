@@ -781,10 +781,10 @@ def build_excel_info_sheet_rows() -> list[dict]:
         {
             "Topic": "Sheets",
             "Value": (
-                "Info | Kontakte (companies) | Prowincje (regions). "
-                "Kontakte columns: Name of Company, Line of business, Company website, "
+                "Info | Kontakte (companies) | Prowincje (same columns, by region). "
+                "Columns: Name of Company, Line of business, Company website, "
                 "E-Mail, Phone number, Region, Localisation, Postcode, "
-                "Tax Identification Number."
+                "Tax Identification Number, URL."
             ),
         },
         {
@@ -1279,16 +1279,17 @@ def line_of_business_from_row(row: dict) -> str:
 
 
 def tax_id_from_row(row: dict) -> str:
-    from cn_contact_fields import extract_pl_nip_from_text, normalize_pl_nip
+    from cn_contact_fields import extract_pl_nip_from_texts, normalize_pl_nip
 
     nip = normalize_pl_nip(str(row.get("nip") or row.get("tax_id") or ""))
     if nip:
         return nip
-    blob = " ".join(
-        str(row.get(k) or "")
-        for k in ("page_snippet", "full_address", "adres", "verification_reason")
+    return extract_pl_nip_from_texts(
+        *(
+            str(row.get(k) or "")
+            for k in ("page_snippet", "full_address", "adres", "verification_reason")
+        )
     )
-    return extract_pl_nip_from_text(blob)
 
 
 def format_handelsketten_for_excel(raw: str) -> str:
@@ -1407,20 +1408,8 @@ def row_to_excel_kontakte_columns(row: dict, email: str = "") -> dict:
 
 
 def row_to_excel_wojewodztwa_columns(row: dict) -> dict:
-    """Mapuje wiersz pipeline na kolumny arkusza Prowincje (EN)."""
-    from cn_excel_en import localisation_to_english, region_to_english
-
-    row = finalize_row_for_excel_tables(dict(row))
-    return {
-        "Name of Company": (row.get("company_name_clean") or row.get("nazwa") or "").strip(),
-        "Region": region_to_english(
-            (row.get("bundesland") or row.get("discovery_bundesland") or "").strip()
-        ),
-        "Localisation": localisation_to_english(
-            (row.get("adres") or row.get("full_address") or "").strip()
-        ),
-        "URL": (row.get("url") or "").strip(),
-    }
+    """Arkusz Prowincje — te same kolumny co Kontakte (w tym NIP / Tax ID)."""
+    return row_to_excel_kontakte_columns(row)
 
 
 def is_row_llm_cleanup_enabled() -> bool:
@@ -3334,7 +3323,9 @@ def merge_contacts_from_crawl(crawl, website: str) -> dict:
     phones: list[str] = []
     company_candidates: list[str] = []
     source_urls: list[str] = []
-    text_parts: list[str] = []
+    priority_texts: list[str] = []
+    other_texts: list[str] = []
+    legal_page_texts: list[str] = []
 
     for url in crawl.urls_visited:
         details = crawl.pages.get(url) or {}
@@ -3349,8 +3340,14 @@ def merge_contacts_from_crawl(crawl, website: str) -> dict:
                 phones.append(p)
         if details.get("company_name"):
             company_candidates.append(details["company_name"])
-        if details.get("page_text"):
-            text_parts.append(details["page_text"])
+        page_text = details.get("page_text") or ""
+        if page_text:
+            # Kontakt / dane firmy na początku — NIP i adres przeżywają truncate 3500.
+            if from_impressum or "nip" in page_text.lower():
+                priority_texts.append(page_text)
+                legal_page_texts.append(page_text)
+            else:
+                other_texts.append(page_text)
         if url not in source_urls:
             source_urls.append(url)
 
@@ -3359,12 +3356,16 @@ def merge_contacts_from_crawl(crawl, website: str) -> dict:
             f"Impressum: {len(impressum_emails)} E-Mail(s) — "
             f"{', '.join(impressum_emails[:3])}"
         )
+    text_parts = priority_texts + other_texts
     page_snippet = _truncate_page_snippet(" ".join(text_parts))
-    from cn_contact_fields import extract_pl_address_from_text, extract_pl_nip_from_text
+    from cn_contact_fields import (
+        extract_pl_address_from_text,
+        extract_pl_nip_from_texts,
+    )
 
     full_address = ""
     for url in crawl.urls_visited:
-        if not _is_impressum_url(url) and "kontakt" not in (url or "").lower():
+        if not _is_impressum_url(url):
             continue
         details = crawl.pages.get(url) or {}
         found = extract_pl_address_from_text(details.get("page_text") or "")
@@ -3373,6 +3374,12 @@ def merge_contacts_from_crawl(crawl, website: str) -> dict:
             break
     if not full_address:
         full_address = extract_pl_address_from_text(page_snippet)
+    # NIP najpierw z pełnych stron Kontakt/dane (przed obcięciem snippetu).
+    nip = extract_pl_nip_from_texts(
+        *legal_page_texts,
+        " ".join(text_parts),
+        page_snippet,
+    )
     return {
         "emails": emails,
         "impressum_emails": impressum_emails,
@@ -3382,7 +3389,7 @@ def merge_contacts_from_crawl(crawl, website: str) -> dict:
         "source_urls": source_urls,
         "page_snippet": page_snippet,
         "full_address": full_address,
-        "nip": extract_pl_nip_from_text(page_snippet),
+        "nip": nip,
     }
 
 
@@ -4740,8 +4747,34 @@ def discover_places_with_serper(
 
 
 def _is_impressum_url(url: str) -> bool:
-    low = (url or "").lower()
-    return "impressum" in low or "/imprint" in low
+    """PL: kontakt / o-firmie / dane firmy; DE: impressum / imprint (tylko path)."""
+    low = (url or "").lower().strip()
+    if not low:
+        return False
+    try:
+        path = (urlparse(low).path or "").lower()
+    except Exception:
+        path = low
+    # Same-domain homepage bez ścieżki nie jest stroną danych firmy.
+    markers = (
+        "impressum",
+        "imprint",
+        "kontakt",
+        "contact",
+        "o-firmie",
+        "o_firmie",
+        "o-nas",
+        "o_nas",
+        "dane-firmy",
+        "dane_firmy",
+        "dane-kontaktowe",
+        "dane_kontaktowe",
+        "about-us",
+        "/about",
+        "/firma",
+        "/firm/",
+    )
+    return any(m in path for m in markers)
 
 
 def guess_impressum_urls(base_url: str) -> list[str]:
@@ -5313,6 +5346,7 @@ def collect_contacts_from_website(
             "website": "",
             "source_urls": [],
             "page_snippet": "",
+            "nip": "",
         }
     console_step(f"Kontakte sammeln (nach WWW-Prüfung): {website}")
     crawl_cache = (cache or {}).get("website_crawl") or {}

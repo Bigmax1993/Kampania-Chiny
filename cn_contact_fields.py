@@ -259,11 +259,25 @@ def serper_discovery_address(*, bucket: str, item: dict) -> str:
 
 
 _NIP_LABEL_RE = re.compile(
-    r"(?:NIP|VAT(?:\s*ID)?|Tax(?:\s*(?:ID|Identification)?\s*Number)?)[:\s]*"
-    r"(?:PL\s*)?(\d{3}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}|\d{10})",
+    r"(?:"
+    r"NIP(?:[\s\-/]*(?:UE|PL|VAT|PL\-?UE))?|"
+    r"Nr\.?\s*NIP|"
+    r"Numer\s+(?:NIP|identyfikacji\s+podatkowej)|"
+    r"Identyfikator\s+podatkowy|"
+    r"VAT(?:\s*(?:ID|UE|PL))?|"
+    r"Tax(?:\s*(?:ID|Identification)?\s*Number)?"
+    r")"
+    r"[\s:=\-–—.]*"
+    r"(?:PL[\s\-]*)?"
+    r"(\d{3}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}|\d{10})",
     re.IGNORECASE,
 )
-_PL_VAT_RE = re.compile(r"\bPL\s*(\d{10})\b", re.IGNORECASE)
+_PL_VAT_RE = re.compile(r"\bPL[\s\-]?(\d{10})\b", re.IGNORECASE)
+# Goły ciąg 10 cyfr tylko przy sąsiedztwie NIP/VAT (bez etykiety w match grupie).
+_NIP_NEAR_CONTEXT_RE = re.compile(
+    r"(?:NIP|VAT|podatkow)\W{0,24}(?:PL[\s\-]*)?(\d{10})",
+    re.IGNORECASE,
+)
 _NIP_WEIGHTS = (6, 5, 7, 2, 3, 4, 5, 6, 7)
 
 
@@ -293,11 +307,28 @@ def extract_pl_nip_from_text(text: str) -> str:
     labeled = _NIP_LABEL_RE.search(blob)
     if labeled:
         nip = normalize_pl_nip(labeled.group(1))
+        if nip and pl_nip_checksum_ok(nip):
+            return nip
+        # Etykieta NIP bez poprawnej sumy kontrolnej — i tak zwróć (jak na stronie).
         if nip:
             return nip
     vat = _PL_VAT_RE.search(blob)
     if vat:
         nip = normalize_pl_nip(vat.group(1))
         if nip and pl_nip_checksum_ok(nip):
+            return nip
+    near = _NIP_NEAR_CONTEXT_RE.search(blob)
+    if near:
+        nip = normalize_pl_nip(near.group(1))
+        if nip and pl_nip_checksum_ok(nip):
+            return nip
+    return ""
+
+
+def extract_pl_nip_from_texts(*texts: str) -> str:
+    """Pierwszy sensowny NIP z listy fragmentów (kolejność = priorytet)."""
+    for text in texts:
+        nip = extract_pl_nip_from_text(text)
+        if nip:
             return nip
     return ""

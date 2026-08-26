@@ -77,6 +77,22 @@ class PlContactFieldsTest(unittest.TestCase):
         self.assertEqual(nip, "123-456-32-18")
         self.assertTrue(pl_nip_checksum_ok(nip))
 
+    def test_extracts_nr_nip_and_tax_id_label(self):
+        from cn_contact_fields import extract_pl_nip_from_text
+
+        self.assertEqual(
+            extract_pl_nip_from_text("Nr NIP 1234563218 REGON 123"),
+            "123-456-32-18",
+        )
+        self.assertEqual(
+            extract_pl_nip_from_text("Tax Identification Number: 123-456-32-18"),
+            "123-456-32-18",
+        )
+        self.assertEqual(
+            extract_pl_nip_from_text("Numer identyfikacji podatkowej: 1234563218"),
+            "123-456-32-18",
+        )
+
     def test_extracts_pl_vat_with_checksum(self):
         from cn_contact_fields import extract_pl_nip_from_text
 
@@ -84,6 +100,17 @@ class PlContactFieldsTest(unittest.TestCase):
             extract_pl_nip_from_text("EU VAT PL1234563218"),
             "123-456-32-18",
         )
+
+    def test_extract_pl_nip_from_texts_priority(self):
+        from cn_contact_fields import extract_pl_nip_from_texts
+
+        homepage = "Hurtownia płytek " + ("oferta " * 400)
+        kontakt = "Kontakt NIP: 123-456-32-18 tel. 22 111 22 33"
+        self.assertEqual(
+            extract_pl_nip_from_texts(kontakt, homepage),
+            "123-456-32-18",
+        )
+        self.assertEqual(extract_pl_nip_from_texts(homepage, ""), "")
 
     def test_serper_organic_has_no_address(self):
         self.assertEqual(

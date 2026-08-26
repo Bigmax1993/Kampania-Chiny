@@ -104,9 +104,18 @@ MATERIAL_URL_PRIORITY_KEYWORDS = (
 )
 IMPRESSUM_GUESS_PATHS = (
     "/kontakt",
+    "/kontakt/",
     "/contact",
+    "/contact/",
     "/o-firmie",
+    "/o-nas",
+    "/o_firmie",
+    "/dane-firmy",
+    "/dane_firmy",
+    "/dane-kontaktowe",
+    "/firma",
     "/about",
+    "/about-us",
     "/impressum",
 )
 SUPPLIER_CONTACT_LINK_KEYWORDS = (

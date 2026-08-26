@@ -215,6 +215,56 @@ class WojewodztwoRotationRegression(unittest.TestCase):
         self.assertNotEqual(nxt, woj)
 
 
+class NipCrawlRegression(unittest.TestCase):
+    def test_impressum_url_detects_pl_kontakt(self):
+        self.assertTrue(scraper._is_impressum_url("https://firma.pl/kontakt"))
+        self.assertTrue(scraper._is_impressum_url("https://firma.pl/o-firmie"))
+        self.assertTrue(scraper._is_impressum_url("https://firma.pl/dane-firmy"))
+        self.assertFalse(scraper._is_impressum_url("https://firma.pl/oferta/plytki"))
+
+    def test_merge_contacts_keeps_nip_beyond_snippet_limit(self):
+        from website_full_crawl import WebsiteCrawlResult
+
+        homepage = "Dystrybutor płytek " + ("katalog oferta " * 500)
+        kontakt = (
+            "POL-SKONE Sp. z o.o. ul. Testowa 1, 20-328 Lublin "
+            "NIP: 123-456-32-18 e-mail: biuro@firma.pl"
+        )
+        crawl = WebsiteCrawlResult(
+            pages={
+                "https://firma.pl": {"page_text": homepage, "emails": [], "phones": []},
+                "https://firma.pl/kontakt": {
+                    "page_text": kontakt,
+                    "emails": ["biuro@firma.pl"],
+                    "phones": [],
+                },
+            },
+            urls_visited=["https://firma.pl", "https://firma.pl/kontakt"],
+        )
+        collected = scraper.merge_contacts_from_crawl(crawl, "https://firma.pl")
+        self.assertEqual(collected.get("nip"), "123-456-32-18")
+        self.assertIn("NIP", collected.get("page_snippet") or "")
+
+    def test_prowincje_sheet_has_same_columns_as_kontakte(self):
+        row = {
+            "nazwa": "Hurtownia Beta",
+            "email_target": "b@beta.pl",
+            "telefon": "500100200",
+            "bundesland": "lubelskie",
+            "adres": "ul. Testowa 1, 20-328 Lublin",
+            "kategoria": "drzwi dystrybutor",
+            "nip": "123-456-32-18",
+            "url": "https://beta.pl",
+            "www": "https://beta.pl",
+        }
+        kontakte = scraper.row_to_excel_kontakte_columns(row, "b@beta.pl")
+        prowincje = scraper.row_to_excel_wojewodztwa_columns(row)
+        self.assertEqual(set(kontakte.keys()), set(prowincje.keys()))
+        self.assertEqual(prowincje["Tax Identification Number"], "123-456-32-18")
+        self.assertEqual(prowincje["E-Mail"], "b@beta.pl")
+        self.assertIn("Lublin", prowincje["Region"])
+
+
 class CampaignPathsRegression(unittest.TestCase):
     def test_cn_output_paths_basename(self):
         paths = campaign_output_paths(ROOT, "cn_materialy")
