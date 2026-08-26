@@ -781,10 +781,11 @@ def build_excel_info_sheet_rows() -> list[dict]:
         {
             "Topic": "Sheets",
             "Value": (
-                "Info | Kontakte (companies) | Prowincje (same columns, by region). "
-                "Columns: Name of Company, Line of business, Company website, "
+                "Info | Kontakte (full contacts) | Prowincje (region index only). "
+                "Kontakte columns: Name of Company, Line of business, Company website, "
                 "E-Mail, Phone number, Region, Localisation, Postcode, "
-                "Tax Identification Number, URL."
+                "Tax Identification Number, URL. "
+                "Prowincje: Name of Company, Region, Localisation, URL."
             ),
         },
         {
@@ -1408,8 +1409,20 @@ def row_to_excel_kontakte_columns(row: dict, email: str = "") -> dict:
 
 
 def row_to_excel_wojewodztwa_columns(row: dict) -> dict:
-    """Arkusz Prowincje — te same kolumny co Kontakte (w tym NIP / Tax ID)."""
-    return row_to_excel_kontakte_columns(row)
+    """Arkusz Prowincje — tylko lokalizacja (pełne kontakty są w Kontakte)."""
+    from cn_excel_en import localisation_to_english, region_to_english
+
+    row = finalize_row_for_excel_tables(dict(row))
+    return {
+        "Name of Company": (row.get("company_name_clean") or row.get("nazwa") or "").strip(),
+        "Region": region_to_english(
+            (row.get("bundesland") or row.get("discovery_bundesland") or "").strip()
+        ),
+        "Localisation": localisation_to_english(
+            (row.get("adres") or row.get("full_address") or "").strip()
+        ),
+        "URL": (row.get("url") or "").strip(),
+    }
 
 
 def is_row_llm_cleanup_enabled() -> bool:

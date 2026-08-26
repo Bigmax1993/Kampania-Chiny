@@ -245,7 +245,7 @@ class NipCrawlRegression(unittest.TestCase):
         self.assertEqual(collected.get("nip"), "123-456-32-18")
         self.assertIn("NIP", collected.get("page_snippet") or "")
 
-    def test_prowincje_sheet_has_same_columns_as_kontakte(self):
+    def test_prowincje_sheet_is_region_index_only(self):
         row = {
             "nazwa": "Hurtownia Beta",
             "email_target": "b@beta.pl",
@@ -259,9 +259,15 @@ class NipCrawlRegression(unittest.TestCase):
         }
         kontakte = scraper.row_to_excel_kontakte_columns(row, "b@beta.pl")
         prowincje = scraper.row_to_excel_wojewodztwa_columns(row)
-        self.assertEqual(set(kontakte.keys()), set(prowincje.keys()))
-        self.assertEqual(prowincje["Tax Identification Number"], "123-456-32-18")
-        self.assertEqual(prowincje["E-Mail"], "b@beta.pl")
+        self.assertEqual(
+            set(prowincje.keys()),
+            {"Name of Company", "Region", "Localisation", "URL"},
+        )
+        self.assertIn("Tax Identification Number", kontakte)
+        self.assertIn("E-Mail", kontakte)
+        self.assertNotIn("Tax Identification Number", prowincje)
+        self.assertNotIn("E-Mail", prowincje)
+        self.assertEqual(kontakte["Tax Identification Number"], "123-456-32-18")
         self.assertIn("Lublin", prowincje["Region"])
 
 
