@@ -5166,9 +5166,9 @@ def backfill_contact_fields_from_www(
             row.get("company_name_clean") or row.get("nazwa") or ""
         ).strip()
         try:
-            # Świeży crawl — cache z artefaktu discovery często bez Kontakt/NIP.
-            collected = collect_contacts_from_website(
-                website, logger, cache=cache, force_refresh=True
+            # Tylko /kontakt /o-firmie — nie 80 stron katalogu produktów.
+            collected = collect_contacts_from_contact_pages(
+                website, logger, cache=cache
             )
             need_claude = (
                 ENABLE_CLAUDE_CONTACT_EXTRACT
@@ -5179,6 +5179,11 @@ def backfill_contact_fields_from_www(
                 )
             )
             if need_claude:
+                # Wyczyść stary pusty wynik Claude z poprzedniego backfillu.
+                extract_cache = cache.setdefault("claude_contact_extract", {})
+                for k in (place_url, website, place_url or website):
+                    if k:
+                        extract_cache.pop(k, None)
                 crawl_text = _get_website_crawl_text(
                     website, cache, purpose="contact"
                 ) or collected.get("page_snippet") or ""
@@ -5601,6 +5606,67 @@ def collect_contacts_from_website(
 
     crawl_result, _ = _crawl_website_for_company(website, logger, cache)
     return merge_contacts_from_crawl(crawl_result, website)
+
+
+def collect_contacts_from_contact_pages(
+    website: str,
+    logger: logging.Logger,
+    cache: dict | None = None,
+) -> dict:
+    """
+    Tylko homepage + typowe /kontakt /o-firmie /dane-firmy — bez crawla 80 stron katalogu.
+    Do backfillu NIP/e-mail/telefon z Excela.
+    """
+    from website_full_crawl import WebsiteCrawlResult
+
+    website = normalize_website(website)
+    empty = {
+        "emails": [],
+        "phones": [],
+        "company_name": "",
+        "website": website or "",
+        "source_urls": [],
+        "page_snippet": "",
+        "nip": "",
+        "full_address": "",
+        "impressum_emails": [],
+    }
+    if not website:
+        return empty
+
+    urls: list[str] = [website]
+    for u in collect_impressum_urls(website):
+        if u not in urls:
+            urls.append(u)
+    urls = sort_contact_urls_priority_pl(urls)[
+        : max(8, int(MAX_IMPRESSUM_GUESS_FETCH or 6))
+    ]
+    console_step(
+        f"Kontakt-Seiten ({len(urls)}): {website}"
+    )
+    result = WebsiteCrawlResult()
+    for u in urls:
+        console_step(f"Kontakt-Seite: {u}")
+        html = _fetch_page_html(u, logger)
+        if not (html or "").strip():
+            continue
+        details = _parse_html_page_for_crawl(u, html, logger, cache)
+        result.pages[u] = details
+        if u not in result.urls_visited:
+            result.urls_visited.append(u)
+        partial = merge_contacts_from_crawl(result, website)
+        if (
+            (partial.get("emails") or partial.get("impressum_emails"))
+            and partial.get("phones")
+            and partial.get("nip")
+        ):
+            break
+
+    if cache is not None and result.urls_visited:
+        cache.setdefault("website_crawl", {})[website] = result
+    if not result.urls_visited:
+        return empty
+    return merge_contacts_from_crawl(result, website)
 
 
 def _assemble_inquiry_email_body(company_name: str, opening: str = "") -> str:
