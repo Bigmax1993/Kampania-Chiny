@@ -122,7 +122,7 @@ Wartości po angielsku; **Name of Company** bez tłumaczenia.
 | Region | województwo (EN, np. Masovian Voivodeship) |
 | Localisation | adres (EN: St. / Warsaw) |
 | Postcode | kod pocztowy PL (XX-XXX) |
-| Tax Identification Number | NIP PL (format `XXX-XXX-XX-XX`) |
+| Tax Identification Number | NIP PL (10 cyfr, bez spacji i myslnikow) |
 | URL | bazowy URL firmy |
 
 ### Prowincje — kolumny

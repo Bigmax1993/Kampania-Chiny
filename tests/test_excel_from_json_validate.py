@@ -73,7 +73,7 @@ class JsonNeededDataTests(unittest.TestCase):
             "https://a.pl": {
                 "company_name_clean": "Hurtownia Materiałów Warszawa",
                 "full_address": "ul. Przemysłowa 12, Warszawa",
-                "page_snippet": "NIP: 123-456-32-18 dystrybutor płytek",
+                "page_snippet": "NIP: 1234563218 dystrybutor płytek",
             }
         }
         excel = [
@@ -96,7 +96,7 @@ class JsonNeededDataTests(unittest.TestCase):
         self.assertEqual(row["Name of Company"], "Hurtownia Materiałów Warszawa")
         self.assertIn("St.", row["Localisation"])
         self.assertIn("Warsaw", row["Localisation"])
-        self.assertEqual(row["Tax Identification Number"], "123-456-32-18")
+        self.assertEqual(row["Tax Identification Number"], "1234563218")
         self.assertTrue(row["Line of business"])
 
     def test_fill_postcode_from_address(self):

@@ -1,0 +1,104 @@
+name: CN fill NIP on Drive Excel
+# Pobiera aktualny Excel z Drive, uzupelnia braki NIP (Serper+BS4+Claude),
+# zapisuje NIP jako 10 cyfr bez '-' / spacji, wgrywa z powrotem (replace).
+
+on:
+  workflow_dispatch:
+    inputs:
+      fill_nip:
+        description: "Uzupelnij brakujace NIP (Serper/Claude)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cn-pipeline
+  cancel-in-progress: false
+
+env:
+  SCRAPER_TIMEZONE: Asia/Shanghai
+  KANBUD_PROJECT_ROOT: ${{ github.workspace }}/libs
+  GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID_CN }}
+  GDRIVE_VERSION_XLSX: "0"
+  GDRIVE_APPEND_XLSX: "0"
+  CLAUDE_UNLIMITED: "1"
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-scraper
+
+      - name: Install Google Drive dependencies
+        run: pip install -r requirements-drive.txt
+
+      - name: Download Excel from Google Drive
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_OAUTH_CLIENT_ID: ${{ secrets.GDRIVE_OAUTH_CLIENT_ID }}
+          GDRIVE_OAUTH_CLIENT_SECRET: ${{ secrets.GDRIVE_OAUTH_CLIENT_SECRET }}
+          GDRIVE_OAUTH_REFRESH_TOKEN: ${{ secrets.GDRIVE_OAUTH_REFRESH_TOKEN }}
+          GDRIVE_IMPERSONATE_EMAIL: ${{ secrets.GDRIVE_IMPERSONATE_EMAIL }}
+          GDRIVE_SHARED_DRIVE_ID: ${{ secrets.GDRIVE_SHARED_DRIVE_ID }}
+        run: |
+          mkdir -p Wyniki
+          python scripts/gdrive_upload_wyniki.py --campaign-dir . --campaign cn --download-xlsx
+
+      - name: Show Excel before
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+          p = Path("Wyniki/cn_materialy_kontakte.xlsx")
+          df = pd.read_excel(p, sheet_name="Kontakte")
+          nip = df["Tax Identification Number"].fillna("").astype(str)
+          print("Kontakte rows=", len(df))
+          print("with any NIP=", int((nip.str.strip() != "").sum()))
+          print(df[["Name of Company", "Tax Identification Number", "URL"]].fillna("").to_string())
+          PY
+
+      - name: Fill + normalize NIP (10 digits)
+        if: ${{ github.event.inputs.fill_nip == 'true' }}
+        run: |
+          python scripts/fill_nip_in_xlsx.py --xlsx Wyniki/cn_materialy_kontakte.xlsx
+
+      - name: Show Excel after
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+          p = Path("Wyniki/cn_materialy_kontakte.xlsx")
+          df = pd.read_excel(p, sheet_name="Kontakte")
+          nip = df["Tax Identification Number"].fillna("").astype(str).str.strip()
+          digits = nip.str.fullmatch(r"\d{10}").fillna(False)
+          print("Kontakte rows=", len(df), "with NIP=", int((nip != "").sum()), "digits10=", int(digits.sum()))
+          print(df[["Name of Company", "Tax Identification Number", "URL"]].fillna("").to_string())
+          PY
+
+      - name: Upload Excel to Google Drive (replace)
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_OAUTH_CLIENT_ID: ${{ secrets.GDRIVE_OAUTH_CLIENT_ID }}
+          GDRIVE_OAUTH_CLIENT_SECRET: ${{ secrets.GDRIVE_OAUTH_CLIENT_SECRET }}
+          GDRIVE_OAUTH_REFRESH_TOKEN: ${{ secrets.GDRIVE_OAUTH_REFRESH_TOKEN }}
+          GDRIVE_IMPERSONATE_EMAIL: ${{ secrets.GDRIVE_IMPERSONATE_EMAIL }}
+          GDRIVE_SHARED_DRIVE_ID: ${{ secrets.GDRIVE_SHARED_DRIVE_ID }}
+        run: |
+          python scripts/gdrive_upload_wyniki.py --campaign-dir . --campaign cn
+
+      - name: Upload Wyniki artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cn-materialy-wyniki-nip-fill
+          path: |
+            Wyniki/
+            wyslane/

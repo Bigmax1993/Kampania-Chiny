@@ -447,6 +447,50 @@ VORLAGE
 """
 
 
+NIP_VERIFY_MAX_CHARS = 12000
+
+
+def build_nip_verify_prompt(
+    company_name: str,
+    website: str,
+    candidates: list[str],
+    evidence_text: str,
+) -> str:
+    """Claude: czy któryś z kandydatów NIP należy do tej firmy PL."""
+    company = " ".join((company_name or "").split()).strip() or "(brak nazwy)"
+    site = " ".join((website or "").split()).strip() or "(brak www)"
+    cand = ", ".join(c for c in candidates if c) or "(brak)"
+    raw = (evidence_text or "").strip()
+    if len(raw) > NIP_VERIFY_MAX_CHARS:
+        raw = raw[:NIP_VERIFY_MAX_CHARS]
+    return f"""ROLLE
+Jesteś weryfikatorem polskiego NIP (Tax Identification Number) dla B2B.
+Zadanie: zdecydować, który NIP należy do TEJ firmy — albo odrzucić wszystkich.
+
+FIRMA
+name={company}
+website={site}
+
+KANDYDACI NIP
+{cand}
+
+REGUŁY (ściśle)
+• Tylko dane z EWIDENCJI poniżej — nic nie wymyślaj.
+• match=true tylko gdy NIP jest wyraźnie powiązany z tą firmą (ta sama nazwa / domena / adres firmy).
+• Odrzuć NIP konkurencji, portali (panorama firm, krs, aleo, money.pl bez jasnej identyfikacji), innych spółek z tej samej strony.
+• Preferuj zapis 10 cyfr bez spacji i myślników (np. 7010645831).
+• Gdy niepewne → match=false, nip="".
+
+OUTPUT (tylko JSON, bez Markdown)
+{{"match":true,"nip":"7010645831","reason":"krótko dlaczego"}}
+lub
+{{"match":false,"nip":"","reason":"..."}}
+
+EWIDENCJA (Serper + strony pobrane requests/BS4)
+{raw or "(pusto)"}
+"""
+
+
 def build_custom_email_prompt_pl(
     draft: str,
     company_name: str,

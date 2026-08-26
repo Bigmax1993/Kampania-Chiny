@@ -228,7 +228,7 @@ class NipCrawlRegression(unittest.TestCase):
         homepage = "Dystrybutor płytek " + ("katalog oferta " * 500)
         kontakt = (
             "POL-SKONE Sp. z o.o. ul. Testowa 1, 20-328 Lublin "
-            "NIP: 123-456-32-18 e-mail: biuro@firma.pl"
+            "NIP: 1234563218 e-mail: biuro@firma.pl"
         )
         crawl = WebsiteCrawlResult(
             pages={
@@ -242,7 +242,7 @@ class NipCrawlRegression(unittest.TestCase):
             urls_visited=["https://firma.pl", "https://firma.pl/kontakt"],
         )
         collected = scraper.merge_contacts_from_crawl(crawl, "https://firma.pl")
-        self.assertEqual(collected.get("nip"), "123-456-32-18")
+        self.assertEqual(collected.get("nip"), "1234563218")
         self.assertIn("NIP", collected.get("page_snippet") or "")
 
     def test_prowincje_sheet_is_region_index_only(self):
@@ -253,7 +253,7 @@ class NipCrawlRegression(unittest.TestCase):
             "bundesland": "lubelskie",
             "adres": "ul. Testowa 1, 20-328 Lublin",
             "kategoria": "drzwi dystrybutor",
-            "nip": "123-456-32-18",
+            "nip": "1234563218",
             "url": "https://beta.pl",
             "www": "https://beta.pl",
             "retail_verified": True,
@@ -269,7 +269,7 @@ class NipCrawlRegression(unittest.TestCase):
         self.assertIn("E-Mail", kontakte)
         self.assertNotIn("Tax Identification Number", prowincje)
         self.assertNotIn("E-Mail", prowincje)
-        self.assertEqual(kontakte["Tax Identification Number"], "123-456-32-18")
+        self.assertEqual(kontakte["Tax Identification Number"], "1234563218")
         self.assertIn("Lublin", prowincje["Region"])
 
     def test_export_without_email_when_supplier_signal(self):

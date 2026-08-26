@@ -5254,6 +5254,34 @@ def backfill_contact_fields_from_www(
             if collected.get("nip") and not tax_id_from_row(updated):
                 updated["nip"] = collected["nip"]
             nip_now = tax_id_from_row(updated)
+            # Brak NIP w JSON/wierszu → Serper → requests+BS4 → Claude → JSON.
+            if not nip_now:
+                try:
+                    from serper_nip_resolve import (
+                        apply_nip_to_contact_json,
+                        resolve_missing_nip_via_serper,
+                    )
+
+                    serper_nip = resolve_missing_nip_via_serper(
+                        company_for_email,
+                        website,
+                        logger,
+                        cache,
+                    )
+                    if serper_nip:
+                        updated["nip"] = serper_nip
+                        nip_now = serper_nip
+                        apply_nip_to_contact_json(
+                            contacts,
+                            url=place_url or website,
+                            website=website,
+                            nip=serper_nip,
+                        )
+                        stats["claude_used"] += 1
+                except Exception as nip_exc:
+                    logger.warning(
+                        "Serper/Claude NIP błąd %s: %s", website, nip_exc
+                    )
             if nip_now and not had_nip:
                 stats["nip_filled"] += 1
             if (updated.get("email_target") or "").strip() and not had_email:

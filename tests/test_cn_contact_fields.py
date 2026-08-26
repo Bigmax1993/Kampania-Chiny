@@ -68,13 +68,29 @@ class PlContactFieldsTest(unittest.TestCase):
         self.assertTrue(is_pl_junk_company_name("Artykuły sezonowe"))
         self.assertTrue(is_pl_seo_title("Fugi do kostki brukowej i płyt Warszawa"))
 
+    def test_extracts_spaced_and_dotted_nip(self):
+        from cn_contact_fields import extract_all_pl_nips_from_text, extract_pl_nip_from_text
+
+        self.assertEqual(
+            extract_pl_nip_from_text("NIP 123 456 32 18 ul. Test"),
+            "1234563218",
+        )
+        self.assertEqual(
+            extract_pl_nip_from_text("N.I.P.: 123.456.32.18"),
+            "1234563218",
+        )
+        nips = extract_all_pl_nips_from_text(
+            "Firma X NIP 1234563218 oraz PL 5252348078"
+        )
+        self.assertIn("1234563218", nips)
+
     def test_extracts_labeled_nip(self):
         from cn_contact_fields import extract_pl_nip_from_text, pl_nip_checksum_ok
 
         nip = extract_pl_nip_from_text(
-            "MAZUR Sp. z o.o. NIP: 123-456-32-18 ul. Budowlana 1"
+            "MAZUR Sp. z o.o. NIP: 1234563218 ul. Budowlana 1"
         )
-        self.assertEqual(nip, "123-456-32-18")
+        self.assertEqual(nip, "1234563218")
         self.assertTrue(pl_nip_checksum_ok(nip))
 
     def test_extracts_nr_nip_and_tax_id_label(self):
@@ -82,15 +98,15 @@ class PlContactFieldsTest(unittest.TestCase):
 
         self.assertEqual(
             extract_pl_nip_from_text("Nr NIP 1234563218 REGON 123"),
-            "123-456-32-18",
+            "1234563218",
         )
         self.assertEqual(
-            extract_pl_nip_from_text("Tax Identification Number: 123-456-32-18"),
-            "123-456-32-18",
+            extract_pl_nip_from_text("Tax Identification Number: 1234563218"),
+            "1234563218",
         )
         self.assertEqual(
             extract_pl_nip_from_text("Numer identyfikacji podatkowej: 1234563218"),
-            "123-456-32-18",
+            "1234563218",
         )
 
     def test_extracts_pl_vat_with_checksum(self):
@@ -98,17 +114,17 @@ class PlContactFieldsTest(unittest.TestCase):
 
         self.assertEqual(
             extract_pl_nip_from_text("EU VAT PL1234563218"),
-            "123-456-32-18",
+            "1234563218",
         )
 
     def test_extract_pl_nip_from_texts_priority(self):
         from cn_contact_fields import extract_pl_nip_from_texts
 
         homepage = "Hurtownia płytek " + ("oferta " * 400)
-        kontakt = "Kontakt NIP: 123-456-32-18 tel. 22 111 22 33"
+        kontakt = "Kontakt NIP: 1234563218 tel. 22 111 22 33"
         self.assertEqual(
             extract_pl_nip_from_texts(kontakt, homepage),
-            "123-456-32-18",
+            "1234563218",
         )
         self.assertEqual(extract_pl_nip_from_texts(homepage, ""), "")
 

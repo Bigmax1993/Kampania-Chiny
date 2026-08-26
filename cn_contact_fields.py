@@ -258,34 +258,54 @@ def serper_discovery_address(*, bucket: str, item: dict) -> str:
     return sanitize_export_address(raw)
 
 
+# Luźny zapis 10 cyfr: 7010645831 / 701-064-58-31 / 701 064 58 31 / 701.064.58.31
+_NIP_DIGITS_CAPTURE = r"((?:\d[\s\-–—.]*){9}\d)"
 _NIP_LABEL_RE = re.compile(
     r"(?:"
-    r"NIP(?:[\s\-/]*(?:UE|PL|VAT|PL\-?UE))?|"
-    r"Nr\.?\s*NIP|"
-    r"Numer\s+(?:NIP|identyfikacji\s+podatkowej)|"
+    r"N\.?\s*I\.?\s*P\.?(?:[\s\-/]*(?:UE|PL|VAT|PL\-?UE))?|"
+    r"Nr\.?\s*N\.?\s*I\.?\s*P\.?|"
+    r"Numer\s+(?:N\.?\s*I\.?\s*P\.?|identyfikacji\s+podatkowej)|"
     r"Identyfikator\s+podatkowy|"
-    r"VAT(?:\s*(?:ID|UE|PL))?|"
-    r"Tax(?:\s*(?:ID|Identification)?\s*Number)?"
+    r"Numer\s+identyfikacyjny|"
+    r"VAT(?:\s*(?:ID|UE|PL|number|nr\.?))?|"
+    r"Tax(?:[\s\-]*(?:ID|Identification)?[\s\-]*Number)?|"
+    r"REGON[\s/]+N\.?\s*I\.?\s*P\.?"
     r")"
-    r"[\s:=\-–—.]*"
+    r"[\s:=\-–—./|]*"
     r"(?:PL[\s\-]*)?"
-    r"(\d{3}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}|\d{10})",
+    + _NIP_DIGITS_CAPTURE,
     re.IGNORECASE,
 )
-_PL_VAT_RE = re.compile(r"\bPL[\s\-]?(\d{10})\b", re.IGNORECASE)
-# Goły ciąg 10 cyfr tylko przy sąsiedztwie NIP/VAT (bez etykiety w match grupie).
-_NIP_NEAR_CONTEXT_RE = re.compile(
-    r"(?:NIP|VAT|podatkow)\W{0,24}(?:PL[\s\-]*)?(\d{10})",
+_PL_VAT_RE = re.compile(
+    r"\bPL[\s\-]?((?:\d[\s\-–—.]*){9}\d)\b",
     re.IGNORECASE,
+)
+# Goły ciąg 10 cyfr przy sąsiedztwie NIP/VAT (szersze okno).
+_NIP_NEAR_CONTEXT_RE = re.compile(
+    r"(?:N\.?\s*I\.?\s*P\.?|VAT|podatkow|identyfikac)\W{0,48}"
+    r"(?:PL[\s\-]*)?" + _NIP_DIGITS_CAPTURE,
+    re.IGNORECASE,
+)
+_NIP_LOOSE_DIGITS_RE = re.compile(r"(?<!\d)" + _NIP_DIGITS_CAPTURE + r"(?!\d)")
+_NIP_CONTEXT_MARKERS = (
+    "nip",
+    "n.i.p",
+    "vat",
+    "podatkow",
+    "identyfikac",
+    "tax id",
+    "tax identification",
+    "regon",
 )
 _NIP_WEIGHTS = (6, 5, 7, 2, 3, 4, 5, 6, 7)
 
 
 def normalize_pl_nip(raw: str) -> str:
+    """NIP jako 10 cyfr bez myślników i spacji (np. 1234563218)."""
     digits = re.sub(r"\D", "", raw or "")
     if len(digits) != 10:
         return ""
-    return f"{digits[0:3]}-{digits[3:6]}-{digits[6:8]}-{digits[8:10]}"
+    return digits
 
 
 def pl_nip_checksum_ok(digits: str) -> bool:
@@ -299,30 +319,43 @@ def pl_nip_checksum_ok(digits: str) -> bool:
     return check == int(d[9])
 
 
-def extract_pl_nip_from_text(text: str) -> str:
-    """NIP / Tax Identification Number z Impressum, stopki lub strony kontakt."""
+def extract_all_pl_nips_from_text(text: str, *, loose: bool = True) -> list[str]:
+    """Wszystkie unikalne NIP z tekstu (luźny regex). Kolejność = pierwsze wystąpienie."""
     blob = text or ""
     if not blob.strip():
-        return ""
-    labeled = _NIP_LABEL_RE.search(blob)
-    if labeled:
-        nip = normalize_pl_nip(labeled.group(1))
-        if nip and pl_nip_checksum_ok(nip):
-            return nip
-        # Etykieta NIP bez poprawnej sumy kontrolnej — i tak zwróć (jak na stronie).
-        if nip:
-            return nip
-    vat = _PL_VAT_RE.search(blob)
-    if vat:
-        nip = normalize_pl_nip(vat.group(1))
-        if nip and pl_nip_checksum_ok(nip):
-            return nip
-    near = _NIP_NEAR_CONTEXT_RE.search(blob)
-    if near:
-        nip = normalize_pl_nip(near.group(1))
-        if nip and pl_nip_checksum_ok(nip):
-            return nip
-    return ""
+        return []
+    found: list[str] = []
+    seen: set[str] = set()
+
+    def _add(raw: str, *, require_checksum: bool) -> None:
+        nip = normalize_pl_nip(raw)
+        if not nip or nip in seen:
+            return
+        if require_checksum and not pl_nip_checksum_ok(nip):
+            return
+        seen.add(nip)
+        found.append(nip)
+
+    for match in _NIP_LABEL_RE.finditer(blob):
+        # Etykieta NIP — przyjmij nawet bez checksum (jak na stronie).
+        _add(match.group(1), require_checksum=False)
+    for match in _PL_VAT_RE.finditer(blob):
+        _add(match.group(1), require_checksum=True)
+    for match in _NIP_NEAR_CONTEXT_RE.finditer(blob):
+        _add(match.group(1), require_checksum=True)
+    if loose:
+        low = blob.lower()
+        has_ctx = any(m in low for m in _NIP_CONTEXT_MARKERS)
+        if has_ctx:
+            for match in _NIP_LOOSE_DIGITS_RE.finditer(blob):
+                _add(match.group(1), require_checksum=True)
+    return found
+
+
+def extract_pl_nip_from_text(text: str) -> str:
+    """NIP / Tax Identification Number z Impressum, stopki lub strony kontakt."""
+    nips = extract_all_pl_nips_from_text(text, loose=True)
+    return nips[0] if nips else ""
 
 
 def extract_pl_nip_from_texts(*texts: str) -> str:

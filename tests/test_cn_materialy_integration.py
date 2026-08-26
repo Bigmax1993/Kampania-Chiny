@@ -218,7 +218,7 @@ def test_kontakte_excel_has_english_product_columns():
             "bundesland": "mazowieckie",
             "adres": "ul. Testowa 1, 00-001 Warszawa",
             "kategoria": "płytki dystrybutor",
-            "nip": "123-456-32-18",
+            "nip": "1234563218",
             "url": "https://alpha.pl",
             "www": "https://alpha.pl",
         },
@@ -234,4 +234,4 @@ def test_kontakte_excel_has_english_product_columns():
     assert row["Region"] == "Masovian Voivodeship"
     assert row["Localisation"] == "St. Testowa 1, 00-001 Warsaw"
     assert row["Postcode"] == "00-001"
-    assert row["Tax Identification Number"] == "123-456-32-18"
+    assert row["Tax Identification Number"] == "1234563218"
