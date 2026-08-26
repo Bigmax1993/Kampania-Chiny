@@ -87,7 +87,8 @@ jobs:
       - name: Verify pending www + backfill and rebuild Excel
         run: |
           CFG="--run-config run_config/cn_materialy.json"
-          python cn_materialy_scraper.py $CFG --verify-pending-contacts --reverify-all-contacts
+          # Tylko pending — NIE --reverify-all (kasowało firmy z Kontakte przy ostrym filtrze).
+          python cn_materialy_scraper.py $CFG --verify-pending-contacts
           python cn_materialy_scraper.py $CFG --backfill-emails-from-cache
           python cn_materialy_scraper.py $CFG --rebuild-from-cache
 

@@ -256,6 +256,8 @@ class NipCrawlRegression(unittest.TestCase):
             "nip": "123-456-32-18",
             "url": "https://beta.pl",
             "www": "https://beta.pl",
+            "retail_verified": True,
+            "is_gu": True,
         }
         kontakte = scraper.row_to_excel_kontakte_columns(row, "b@beta.pl")
         prowincje = scraper.row_to_excel_wojewodztwa_columns(row)
@@ -269,6 +271,43 @@ class NipCrawlRegression(unittest.TestCase):
         self.assertNotIn("E-Mail", prowincje)
         self.assertEqual(kontakte["Tax Identification Number"], "123-456-32-18")
         self.assertIn("Lublin", prowincje["Region"])
+
+    def test_export_without_email_when_supplier_signal(self):
+        row = {
+            "nazwa": "Dystrybutor Płytek SA",
+            "email_target": "",
+            "url": "https://plytki-hurt.pl",
+            "www": "https://plytki-hurt.pl",
+            "page_snippet": "oficjalny dystrybutor płytek ceramicznych katalog",
+            "gu_marker": "dystrybutor",
+            "is_gu": True,
+            "retail_verified": False,
+        }
+        self.assertTrue(scraper.is_row_eligible_for_excel_export(row))
+
+    def test_prowincje_uses_same_eligibility_as_kontakte(self):
+        good = {
+            "nazwa": "Hurt A",
+            "email_target": "a@a.pl",
+            "url": "https://a.pl",
+            "www": "https://a.pl",
+            "bundesland": "mazowieckie",
+            "adres": "ul. A 1, 00-001 Warszawa",
+            "retail_verified": True,
+            "is_gu": True,
+            "page_snippet": "dystrybutor płytek",
+        }
+        junk = {
+            "nazwa": "nieznana firma",
+            "email_target": "",
+            "url": "",
+            "www": "",
+        }
+        kontakte = scraper.build_export_rows([good, junk], require_eligible=True)
+        prowincje = scraper.build_bundesland_rows([good, junk], require_eligible=True)
+        self.assertEqual(len(kontakte), 1)
+        self.assertEqual(len(prowincje), 1)
+        self.assertEqual(kontakte[0]["URL"], prowincje[0]["URL"])
 
 
 class CampaignPathsRegression(unittest.TestCase):

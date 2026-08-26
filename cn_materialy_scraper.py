@@ -823,7 +823,9 @@ def save_excel(
             cache=cache,
             require_eligible=require_eligible,
         )
-        state_rows = build_bundesland_rows(rows_for_excel)
+        state_rows = build_bundesland_rows(
+            rows_for_excel, require_eligible=require_eligible
+        )
         if cache is None:
             cache = {}
         cfg = ReplySyncConfig(
@@ -1624,7 +1626,8 @@ def is_row_eligible_for_excel_export(row: dict) -> bool:
         return False
     if REQUIRE_GENERALUNTERNEHMER and not _row_has_gu_signal(row):
         return False
-    return False
+    # URL + nazwa + sygnał dostawcy — eksportuj nawet bez e-maila (uzupełni backfill).
+    return bool(url and name)
 
 
 def build_export_rows(rows, logger=None, cache=None, require_eligible=True):
@@ -1676,11 +1679,14 @@ def build_export_rows(rows, logger=None, cache=None, require_eligible=True):
     return export_rows
 
 
-def build_bundesland_rows(rows):
+def build_bundesland_rows(rows, *, require_eligible: bool = True):
+    """Indeks regionu — te same firmy co Kontakte (bez pełnych kolumn kontaktowych)."""
     state_rows = []
     seen = set()
     for row in rows:
         row = normalize_row_company_name(row)
+        if require_eligible and not is_row_eligible_for_excel_export(row):
+            continue
         table = row_to_excel_wojewodztwa_columns(row)
         row_name = (table.get("Name of Company") or table.get("Nazwa firmy") or "").strip()
         row_url = (table.get("URL") or "").strip()
@@ -1850,6 +1856,40 @@ def load_existing_output(path: Path, logger: logging.Logger):
             url = (row.get("url") or "").strip()
             if url:
                 seen_urls.add(url)
+        # Prowincje może mieć firmy, których nie ma w Kontakte (stary bug filtrów).
+        try:
+            df_prov = pd.read_excel(path, sheet_name="Prowincje")
+        except Exception:
+            df_prov = None
+        recovered = 0
+        if df_prov is not None and not df_prov.empty:
+            for rec in df_prov.fillna("").to_dict(orient="records"):
+                row = row_from_excel_record(rec)
+                if not row:
+                    continue
+                url = (row.get("url") or row.get("www") or "").strip()
+                name = (row.get("nazwa") or row.get("company_name_clean") or "").strip()
+                if not url and not name:
+                    continue
+                if url and url in seen_urls:
+                    continue
+                if not url and name:
+                    # bez URL — tylko jeśli nie ma już takiej nazwy
+                    if any(
+                        (r.get("nazwa") or r.get("company_name_clean") or "").strip().lower()
+                        == name.lower()
+                        for r in rows
+                    ):
+                        continue
+                rows.append(row)
+                recovered += 1
+                if url:
+                    seen_urls.add(url)
+        if recovered:
+            logger.info(
+                "XLSX: odzyskano %s firm z arkusza Prowincje (brakowało w Kontakte)",
+                recovered,
+            )
         logger.info(f"XLSX geladen: {len(rows)} Zeilen, URLs={len(seen_urls)}")
     except Exception as e:
         logger.warning(f"XLSX-Ladefehler ({e}) – starte leer.")
