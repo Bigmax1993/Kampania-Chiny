@@ -13,11 +13,14 @@ Drive: [`docs/GOOGLE_DRIVE.md`](GOOGLE_DRIVE.md)
 | **Tests** | `tests.yml` | push, PR | smoke + pytest + `test_repo_isolation` |
 | **CI Deploy** | `ci-deploy.yml` | push | smoke + secrets + dry-run maili |
 | **CN discovery** | `cn_materialy_pi.yml` | cron, ręcznie | Discovery pon–pt → `cn-materialy-wyniki-pi` |
-| **CN niedziela backfill** | `cn_materialy_thu.yml` | cron, ręcznie | Crawl www → append do istniejącego Excela na Drive → **2×** JSON→Excel → Drive (ten sam plik) → `cn-materialy-wyniki-thu` |
+| **CN niedziela backfill** | `cn_materialy_thu.yml` | cron, ręcznie | Crawl www (w tym NIP ze stron Kontakt) → append do istniejącego Excela na Drive → **2×** JSON→Excel → Drive (ten sam plik) → `cn-materialy-wyniki-thu` |
 | **CN poniedzialek prep** | `cn_materialy_mon.yml` | cron, ręcznie | Rebuild Excel → **2×** JSON→Excel → Drive (append do tego samego pliku) → `cn-materialy-wyniki-mon` |
 | **CN poniedzialek send** | `cn_materialy_tue.yml` | cron, ręcznie | Wysyłka partia 1 (300) → `cn-materialy-wyniki-tue` |
 | **CN wtorek send** | `cn_materialy_fri.yml` | cron, ręcznie | Wysyłka partia 2 → `cn-materialy-wyniki-fri` |
+| **PL rebuild Excel** | `cn_materialy_rebuild_excel.yml` | ręcznie | Przebudowa `cn_materialy_kontakte.xlsx` z cache + opcjonalny upload Drive |
 | **Sync wyniki Google Drive CN** | `sync-google-drive-cn.yml` | cron pon 10:00, ręcznie | Upload `Wyniki/` → [folder CN](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC) |
+
+Excel na Drive: arkusz **Kontakte** = pełne kontakty; **Prowincje** = indeks regionu. Opis kolumn: [`CN_MATERIALY.md`](CN_MATERIALY.md#excel-i-google-drive).
 
 Concurrency: `cn-pipeline` (w tym repo).
 

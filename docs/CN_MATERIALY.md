@@ -98,9 +98,19 @@ Krótko:
 
 ## Excel i Google Drive
 
-Końcowy plik: **`cn_materialy_kontakte.xlsx`** (arkusz **Kontakte**)
+Końcowy plik: **`cn_materialy_kontakte.xlsx`** (trzy arkusze).
 
-Kolumny (wartości po angielsku; **Name of Company** bez tłumaczenia):
+| Arkusz | Rola |
+|--------|------|
+| **Kontakte** | Pełna baza kontaktów B2B — tu są wszystkie dane firm (e-mail, telefon, NIP itd.). |
+| **Prowincje** | Tylko indeks regionu (bez e-maila / telefonu / NIP). |
+| **Info** | Opis pliku i kolumn. |
+
+**Pełne kontakty oglądaj wyłącznie w arkuszu Kontakte.** Prowincje nie jest kopią bazy — służy do szybkiego filtrowania po województwie.
+
+### Kontakte — kolumny
+
+Wartości po angielsku; **Name of Company** bez tłumaczenia.
 
 | Kolumna | Źródło |
 |---------|--------|
@@ -112,13 +122,31 @@ Kolumny (wartości po angielsku; **Name of Company** bez tłumaczenia):
 | Region | województwo (EN, np. Masovian Voivodeship) |
 | Localisation | adres (EN: St. / Warsaw) |
 | Postcode | kod pocztowy PL (XX-XXX) |
-| Tax Identification Number | NIP (PL) |
+| Tax Identification Number | NIP PL (format `XXX-XXX-XX-XX`) |
+| URL | bazowy URL firmy |
+
+### Prowincje — kolumny
+
+| Kolumna | Opis |
+|---------|------|
+| Name of Company | nazwa firmy |
+| Region | województwo (EN) |
+| Localisation | adres (EN) |
+| URL | bazowy URL |
+
+### Tax Identification Number (NIP)
+
+NIP jest wyciągany z crawlowanej strony (priorytet: `/kontakt`, `/o-firmie`, `/dane-firmy`, stopka) przez `cn_contact_fields.extract_pl_nip_from_text` — etykiety m.in. `NIP`, `Nr NIP`, `Tax Identification Number`, `PL` + 10 cyfr.  
+Strony Kontakt trafiają na początek `page_snippet`, żeby NIP nie wypadał poza limit 3500 znaków.  
+Po zmianie logiki NIP potrzebny jest **crawl / backfill** (same stare snippetty w cache bez NIP nie wystarczą).
 
 Folder: [https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC?usp=drive_link)
 
 Nie używaj folderów PL (`1O15CdN0…`) ani UA (`1NeQnfW-…`).
 
 Na końcu niedzieli (backfill) Excel to **zawsze ten sam plik** `cn_materialy_kontakte.xlsx`: pipeline pobiera go z Drive, dopisuje nowe firmy i puste pola, potem **dwa razy** sprawdza względem `*_cache.json` i wgrywa z powrotem (append po URL, bez kopii z datą). Przy uzupełnianiu z JSON walidacja jest **luźniejsza** niż przy discovery (np. adres bez kodu pocztowego), ale nadal bez śmieci (OLX/Allegro, noreply, „Kontakt”, teksty marketingowe). Jeśli po obu rundach nadal są luki — job pada (`VERIFY_FAIL`). Poniedziałkowy prep robi to samo.
+
+**Uwaga:** Excel **nie** leży w repo GitHub (`Wyniki/` w `.gitignore`). Produkcyjny plik jest na Google Drive; lokalny / artefakt Actions może różnić się od Drive, dopóki nie przejdzie sync/backfill.
 
 Opis sync: [`docs/GOOGLE_DRIVE.md`](GOOGLE_DRIVE.md)
 
@@ -149,7 +177,9 @@ Concurrency: `cn-pipeline` (osobne repo — bez kolizji z PL/UA).
 
 | Moduł | Plik |
 |-------|------|
-| Scraper | `cn_materialy_scraper.py` |
+| Scraper / Excel Kontakte + Prowincje | `cn_materialy_scraper.py` |
+| NIP, adres, nazwa (PL) | `cn_contact_fields.py` |
+| Tłumaczenie pól Excel (EN) | `cn_excel_en.py` |
 | Frazy i województwa | `cn_province_keywords.py` |
 | Rotacja | `cn_province_rotation.py` |
 | Filtr | `cn_materialy_supplier_filter.py` |
@@ -170,11 +200,10 @@ Nazwy `cn_*` zostają (izolacja: w tym repo **nie** może być `pl_*.py` / `ua_*
 ```powershell
 $env:KANBUD_PROJECT_ROOT = "$PWD\libs"
 python cn_materialy_scraper.py --test
-python -m unittest tests.test_cn_materialy_regression -v
-python -m pytest tests/test_cn_inquiry_email_zh.py tests/test_cn_claude_inquiry_email.py tests/test_cn_materialy_integration.py tests/test_repo_isolation.py -q
+python -m pytest tests/ -q
 ```
 
-Pełna bateria: `powershell -ExecutionPolicy Bypass -File scripts\RUN_ALL_TESTS.ps1`
+Pełna bateria (compile + smoke + regresja): `powershell -ExecutionPolicy Bypass -File scripts\RUN_ALL_TESTS.ps1`
 
 ---
 

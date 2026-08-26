@@ -37,7 +37,12 @@ Secret Drive: `GDRIVE_FOLDER_ID_CN` = `1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC`
 
 Folder: [CN Materialy — Google Drive](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC?usp=drive_link)
 
-Plik Excel: `cn_materialy_kontakte.xlsx`
+Plik Excel: `cn_materialy_kontakte.xlsx`  
+- **Kontakte** — pełne kontakty (e-mail, telefon, Tax Identification Number / NIP, …)  
+- **Prowincje** — tylko Name of Company, Region, Localisation, URL  
+- **Info** — opis pliku  
+
+Szczegóły kolumn: [`docs/CN_MATERIALY.md`](../../docs/CN_MATERIALY.md#excel-i-google-drive).
 
 Concurrency: `cn-pipeline` — osobne repo, bez kolizji z PL/UA.
 

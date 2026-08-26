@@ -26,7 +26,9 @@ Szczegóły: [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md) · maile: [`docs/MAI
 
 Maile po polsku do dystrybutorów w Polsce, **bez telefonu i bez strony www**, **bez załączników**.
 
-Wyniki: `Wyniki/cn_materialy_cache.json`, `cn_materialy_kontakte.xlsx`.
+Wyniki: `Wyniki/cn_materialy_cache.json`, `cn_materialy_kontakte.xlsx` (lokalnie / artefakt Actions; produkcja na [Google Drive](https://drive.google.com/drive/folders/1ZzEvH0lkoO3SSTJYFCy-HzY57ccsYaVC)).
+
+Excel — arkusz **Kontakte** = pełne dane (w tym Tax Identification Number / NIP); arkusz **Prowincje** = tylko indeks regionu. Szczegóły: [`docs/CN_MATERIALY.md`](docs/CN_MATERIALY.md#excel-i-google-drive).
 
 ---
 
@@ -53,8 +55,7 @@ Skopiuj `.env.example` → `.env` (lokalnie; na CI ustaw [GitHub Secrets](#githu
 ```powershell
 $env:KANBUD_PROJECT_ROOT = "$PWD\libs"
 python cn_materialy_scraper.py --test
-python -m unittest tests.test_cn_materialy_regression -v
-python -m pytest tests/test_cn_inquiry_email_zh.py tests/test_cn_materialy_integration.py tests/test_repo_isolation.py -q
+python -m pytest tests/ -q
 ```
 
 Pełna bateria: `powershell -ExecutionPolicy Bypass -File scripts\RUN_ALL_TESTS.ps1`

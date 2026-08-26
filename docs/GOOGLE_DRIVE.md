@@ -10,11 +10,13 @@ Folder w chmurze: [CN Materialy Budowlane](https://drive.google.com/drive/folder
 
 | Plik / folder | Gdzie |
 |---------------|--------|
-| `cn_materialy_kontakte.xlsx` | **Google Drive** (jeden plik — append wierszy, bez kopii z datą). Kolumny: Name of Company, Line of business, Company website, E-Mail, Phone number, Region, Localisation, Postcode, Tax Identification Number. |
+| `cn_materialy_kontakte.xlsx` | **Google Drive** (jeden plik — append wierszy, bez kopii z datą). Arkusze: **Kontakte** (pełne kontakty: Name of Company, Line of business, Company website, E-Mail, Phone number, Region, Localisation, Postcode, Tax Identification Number, URL), **Prowincje** (tylko Name of Company, Region, Localisation, URL), **Info**. |
 | `wyslane/*.eml` | **Google Drive** (kopie wysłanych maili) |
-| `cn_materialy_cache.json` | **GitHub Actions** (artefakt `cn-materialy-wyniki-*`) |
+| `cn_materialy_cache.json` | **GitHub Actions** (artefakt `cn-materialy-wyniki-*`) — **nie** na Drive |
 | `cn_materialy_scraper.log` | **GitHub Actions** (artefakt) |
 | `cn_materialy_province_rotation.json` | **GitHub Actions** (artefakt) |
+
+Excel **nie** jest w repozytorium GitHub (`Wyniki/` w `.gitignore`). Źródło prawdy dla pliku wynikowego: folder Drive CN. Podgląd `.xlsx` w Google Sheets bywa pusty — lepiej **Pobierz** i otwórz w Excelu.
 
 | Sposób | Kiedy |
 |--------|--------|
