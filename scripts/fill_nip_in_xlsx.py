@@ -169,6 +169,26 @@ def main() -> int:
         for name, sheet_df in sheets.items():
             sheet_df.to_excel(writer, sheet_name=name, index=False)
 
+    # Excel lubi zamieniać 10 cyfr na float (…3271.0) — wymuś tekst.
+    try:
+        from openpyxl import load_workbook
+
+        wb = load_workbook(path)
+        if args.sheet in wb.sheetnames:
+            ws = wb[args.sheet]
+            header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            if nip_col in header:
+                col_idx = header.index(nip_col) + 1
+                for row_i in range(2, ws.max_row + 1):
+                    cell = ws.cell(row=row_i, column=col_idx)
+                    nip = normalize_pl_nip(str(cell.value or ""))
+                    if nip:
+                        cell.value = nip
+                        cell.number_format = "@"
+                wb.save(path)
+    except Exception as exc:
+        logger.warning("Nie ustawiono formatu tekstowego NIP: %s", exc)
+
     if args.save_cache and (json_writes or reformatted):
         save_cache(cache, logger)
 
