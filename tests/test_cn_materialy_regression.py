@@ -310,6 +310,44 @@ class NipCrawlRegression(unittest.TestCase):
         self.assertEqual(kontakte[0]["URL"], prowincje[0]["URL"])
 
 
+class ExportColumnsRegression(unittest.TestCase):
+    def test_build_export_rows_omits_reply_crm_columns(self):
+        from libs.scraper_email_replies import all_reply_export_column_names
+
+        cache = {
+            "contacts": {
+                "https://a.pl": {
+                    "email_target": "a@a.pl",
+                    "email_sent_at": "2026-01-01T10:00:00",
+                    "reply_at": "2026-01-02T11:00:00",
+                    "reply_status": "replied_with_price",
+                    "price_main": "100",
+                    "price_currency": "PLN",
+                    "reply_description": "oferta",
+                    "prices_all": "100 PLN",
+                    "price_source": "mail",
+                    "price_rel": {"rel_1": "10", "rel_2": "20", "rel_3": "30"},
+                    "requires_intervention": True,
+                }
+            }
+        }
+        row = {
+            "nazwa": "Hurt A",
+            "email_target": "a@a.pl",
+            "url": "https://a.pl",
+            "www": "https://a.pl",
+            "bundesland": "mazowieckie",
+            "adres": "ul. A 1, 00-001 Warszawa",
+            "retail_verified": True,
+            "is_gu": True,
+            "page_snippet": "dystrybutor płytek",
+        }
+        kontakte = scraper.build_export_rows([row], cache=cache, require_eligible=True)
+        self.assertEqual(len(kontakte), 1)
+        for col in all_reply_export_column_names():
+            self.assertNotIn(col, kontakte[0], f"unexpected CRM column: {col}")
+
+
 class CampaignPathsRegression(unittest.TestCase):
     def test_cn_output_paths_basename(self):
         paths = campaign_output_paths(ROOT, "cn_materialy")

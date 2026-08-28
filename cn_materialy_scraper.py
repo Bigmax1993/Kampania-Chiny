@@ -183,7 +183,6 @@ from scraper_runtime_limit import (
 from scraper_email_replies import (
     ReplySyncConfig,
     mark_email_sent,
-    merge_export_row,
     write_excel_with_reply_styles,
 )
 from de_contractor_exclusions import (
@@ -1688,10 +1687,7 @@ def build_export_rows(rows, logger=None, cache=None, require_eligible=True):
             table_cols = row_to_excel_kontakte_columns(row, email)
         else:
             table_cols = row_to_excel_kontakte_columns(row, email)
-        base = dict(table_cols)
-        if cache is not None and email:
-            base = merge_export_row(base, cache, email, lang="en")
-        export_rows.append(base)
+        export_rows.append(dict(table_cols))
     if logger is not None:
         with_mail = sum(
             1

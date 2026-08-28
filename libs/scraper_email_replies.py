@@ -88,6 +88,38 @@ REPLY_EXPORT_COLUMNS = [
     "Zadzwoń?",
 ]
 
+REPLY_EXPORT_COLUMNS_EN = [
+    "Email status",
+    "Sent",
+    "Reply",
+    "Reply status",
+    "Needs action",
+    "Marked read",
+    "Price",
+    "Currency",
+    "Description",
+    "All prices",
+    "Price source",
+    "Call?",
+]
+
+REPLY_EXPORT_REL_COLUMNS_PL = ("Cena rel. 1", "Cena rel. 2", "Cena rel. 3")
+REPLY_EXPORT_REL_COLUMNS_EN = ("Price lane 1", "Price lane 2", "Price lane 3")
+
+
+def all_reply_export_column_names() -> frozenset[str]:
+    return frozenset(
+        list(REPLY_EXPORT_COLUMNS)
+        + list(REPLY_EXPORT_COLUMNS_EN)
+        + list(REPLY_EXPORT_REL_COLUMNS_PL)
+        + list(REPLY_EXPORT_REL_COLUMNS_EN)
+    )
+
+
+def strip_reply_export_columns(row: dict) -> dict:
+    drop = all_reply_export_column_names()
+    return {k: v for k, v in row.items() if k not in drop}
+
 ORANGE_FILL_RGB = "FFFFE699"
 
 # Kotwice relacji (transport PL) — dopasowanie cen w tekście/OCR
@@ -1660,6 +1692,7 @@ def preset_to_config(preset: dict, no_reply_hours: float, imap_days: int) -> Rep
         no_reply_hours=no_reply_hours,
         imap_days_back=imap_days,
         main_sheet_names=tuple(preset.get("main_sheets", preset.get("sheets", ("Kontakte",)))),
+        include_reply_export_columns=preset.get("include_reply_export_columns", True),
     )
 
 
@@ -2525,6 +2558,8 @@ def write_excel_with_reply_styles(
                     r["_call_needed"] = False
                     r["_intervention_unread"] = False
                     r["_reply_questions"] = False
+                if not config.include_reply_export_columns:
+                    r = strip_reply_export_columns(r)
                 enriched.append(r)
             df = pd.DataFrame(enriched)
             meta_cols = [c for c in df.columns if c.startswith("_")]

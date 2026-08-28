@@ -73,6 +73,7 @@ def pl_preset() -> dict:
         "campaign_id": PL_CAMPAIGN_ID,
         "sheets": ("Kontakte", "Prowincje"),
         "main_sheets": ("Kontakte",),
+        "include_reply_export_columns": False,
     }
 
 
