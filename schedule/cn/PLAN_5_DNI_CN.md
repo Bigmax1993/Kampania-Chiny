@@ -51,5 +51,5 @@ Concurrency: `cn-pipeline` — osobne repo, bez kolizji z PL/UA.
 ## Task Scheduler (Windows)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "schedule\cn\register_tasks_5_dni.ps1"
+powershell -ExecutionPolicy Bypass -File "schedule\cn\Chiny-Kampania"
 ```

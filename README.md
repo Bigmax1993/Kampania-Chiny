@@ -90,7 +90,7 @@ Offset +5h względem UA — pipeline PL w **osobnym repo**, bez kolizji cron.
 Task Scheduler (PC):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File schedule\cn\register_tasks_5_dni.ps1
+powershell -ExecutionPolicy Bypass -File schedule\cn\Chiny-Kampania
 ```
 
 Ręczny pełny pipeline GHA:
