@@ -1,0 +1,30 @@
+name: tmp-copy-gdrive-oauth
+on:
+  workflow_dispatch:
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy Drive OAuth secrets to Wyszukiwarka-partnerow
+        env:
+          GH_TOKEN: ${{ secrets.TEMP_COPY_TOKEN }}
+          GDRIVE_OAUTH_CLIENT_ID: ${{ secrets.GDRIVE_OAUTH_CLIENT_ID }}
+          GDRIVE_OAUTH_CLIENT_SECRET: ${{ secrets.GDRIVE_OAUTH_CLIENT_SECRET }}
+          GDRIVE_OAUTH_REFRESH_TOKEN: ${{ secrets.GDRIVE_OAUTH_REFRESH_TOKEN }}
+          DEST: Bigmax1993/Wyszukiwarka-partnerow
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "MISSING TEMP_COPY_TOKEN"
+            exit 1
+          fi
+          for name in GDRIVE_OAUTH_CLIENT_ID GDRIVE_OAUTH_CLIENT_SECRET GDRIVE_OAUTH_REFRESH_TOKEN; do
+            val="${!name}"
+            if [ -z "$val" ]; then
+              echo "MISSING source secret: $name"
+              exit 1
+            fi
+            printf '%s' "$val" | gh secret set "$name" -R "$DEST"
+            echo "OK set $name (length ${#val})"
+          done
+          echo "Done copying OAuth to $DEST"
